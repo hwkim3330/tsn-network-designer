@@ -1,0 +1,1235 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KETI Automotive TSN Network Designer</title>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.28.1/cytoscape.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+
+    <style>
+        :root {
+            --primary: #0066FF;
+            --primary-dark: #0052CC;
+            --primary-light: #4D94FF;
+            --success: #00C853;
+            --warning: #FF9800;
+            --danger: #F44336;
+            --info: #00BCD4;
+            --bg-main: #F5F7FA;
+            --bg-card: #FFFFFF;
+            --text-primary: #1A1A1A;
+            --text-secondary: #666666;
+            --border: #E0E0E0;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+            background: linear-gradient(135deg, #0066FF 0%, #00BCD4 100%);
+            overflow: hidden;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        .app {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+
+        /* 헤더 */
+        .header {
+            height: 72px;
+            background: rgba(255, 255, 255, 0.98);
+            backdrop-filter: blur(20px);
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 32px;
+            box-shadow: 0 2px 12px rgba(0, 102, 255, 0.08);
+            z-index: 100;
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 24px;
+        }
+
+        .logo {
+            height: 48px;
+        }
+
+        .title-group h1 {
+            font-size: 20px;
+            font-weight: 700;
+            color: var(--primary);
+            margin-bottom: 4px;
+        }
+
+        .title-group p {
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+
+        .stats {
+            display: flex;
+            gap: 32px;
+        }
+
+        .stat {
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 24px;
+            font-weight: 700;
+            color: var(--primary);
+        }
+
+        .stat-label {
+            font-size: 11px;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-top: 4px;
+        }
+
+        .header-actions {
+            display: flex;
+            gap: 12px;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            border-radius: 8px;
+            border: none;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 13px;
+            font-family: inherit;
+        }
+
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: var(--primary-dark);
+            transform: translateY(-1px);
+        }
+
+        .btn-secondary {
+            background: white;
+            color: var(--primary);
+            border: 2px solid var(--primary);
+        }
+
+        .btn-secondary:hover {
+            background: var(--primary);
+            color: white;
+        }
+
+        /* 메인 */
+        .main {
+            flex: 1;
+            display: flex;
+            overflow: hidden;
+        }
+
+        /* 사이드바 */
+        .sidebar {
+            width: 360px;
+            background: rgba(255, 255, 255, 0.98);
+            backdrop-filter: blur(20px);
+            border-right: 1px solid var(--border);
+            overflow-y: auto;
+        }
+
+        .sidebar-section {
+            padding: 24px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .section-title {
+            font-size: 11px;
+            font-weight: 700;
+            color: var(--primary);
+            text-transform: uppercase;
+            letter-spacing: 1.2px;
+            margin-bottom: 20px;
+        }
+
+        .device-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 12px;
+        }
+
+        .device-card {
+            background: white;
+            border: 2px solid var(--border);
+            border-radius: 12px;
+            padding: 16px;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .device-card:hover {
+            border-color: var(--primary);
+            transform: translateX(4px);
+            box-shadow: 0 4px 16px rgba(0, 102, 255, 0.12);
+        }
+
+        .device-icon-container {
+            width: 56px;
+            height: 56px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, rgba(0, 102, 255, 0.1) 0%, rgba(0, 188, 212, 0.1) 100%);
+            border-radius: 10px;
+        }
+
+        .device-icon-container svg {
+            width: 36px;
+            height: 36px;
+        }
+
+        .device-details {
+            flex: 1;
+        }
+
+        .device-name {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 4px;
+        }
+
+        .device-specs {
+            font-size: 11px;
+            color: var(--text-secondary);
+            line-height: 1.6;
+        }
+
+        .device-badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 10px;
+            font-weight: 600;
+            margin-top: 4px;
+        }
+
+        .badge-automotive {
+            background: #E3F2FD;
+            color: #1976D2;
+        }
+
+        .badge-industrial {
+            background: #FFF3E0;
+            color: #F57C00;
+        }
+
+        /* 캔버스 */
+        .canvas {
+            flex: 1;
+            position: relative;
+        }
+
+        #cy {
+            width: 100%;
+            height: 100%;
+            background:
+                radial-gradient(circle at 20% 30%, rgba(255, 255, 255, 0.1) 0%, transparent 50%),
+                radial-gradient(circle at 80% 70%, rgba(255, 255, 255, 0.08) 0%, transparent 50%);
+        }
+
+        /* 플로팅 컨트롤 */
+        .floating-controls {
+            position: absolute;
+            bottom: 32px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 12px;
+            background: rgba(255, 255, 255, 0.98);
+            backdrop-filter: blur(20px);
+            padding: 12px;
+            border-radius: 12px;
+            box-shadow: 0 4px 24px rgba(0, 0, 0, 0.12);
+        }
+
+        .control-btn {
+            width: 48px;
+            height: 48px;
+            border-radius: 10px;
+            background: white;
+            border: 2px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 20px;
+        }
+
+        .control-btn:hover {
+            background: var(--primary);
+            border-color: var(--primary);
+            color: white;
+            transform: translateY(-2px);
+        }
+
+        /* 프로퍼티 패널 */
+        .properties {
+            width: 420px;
+            background: rgba(255, 255, 255, 0.98);
+            backdrop-filter: blur(20px);
+            border-left: 1px solid var(--border);
+            transform: translateX(100%);
+            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            position: absolute;
+            right: 0;
+            top: 0;
+            height: 100%;
+            z-index: 50;
+            box-shadow: -4px 0 24px rgba(0, 0, 0, 0.08);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .properties.visible {
+            transform: translateX(0);
+        }
+
+        .properties-header {
+            height: 72px;
+            padding: 0 24px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: linear-gradient(135deg, rgba(0, 102, 255, 0.05) 0%, rgba(0, 188, 212, 0.05) 100%);
+        }
+
+        .properties-title {
+            font-size: 16px;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+
+        .close-btn {
+            width: 36px;
+            height: 36px;
+            border-radius: 8px;
+            background: transparent;
+            border: none;
+            cursor: pointer;
+            font-size: 18px;
+            color: var(--text-secondary);
+            transition: all 0.2s;
+        }
+
+        .close-btn:hover {
+            background: rgba(0, 0, 0, 0.05);
+            color: var(--text-primary);
+        }
+
+        .properties-content {
+            padding: 24px;
+            overflow-y: auto;
+            flex: 1;
+        }
+
+        .prop-section {
+            margin-bottom: 28px;
+        }
+
+        .prop-section-title {
+            font-size: 11px;
+            font-weight: 700;
+            color: var(--primary);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 16px;
+        }
+
+        .form-group {
+            margin-bottom: 16px;
+        }
+
+        .form-label {
+            display: block;
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 8px;
+        }
+
+        .form-input, .form-select {
+            width: 100%;
+            padding: 10px 14px;
+            border: 2px solid var(--border);
+            border-radius: 8px;
+            font-size: 13px;
+            transition: all 0.2s;
+            font-family: inherit;
+        }
+
+        .form-input:focus, .form-select:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(0, 102, 255, 0.1);
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 600;
+            margin-right: 6px;
+            margin-bottom: 6px;
+        }
+
+        .badge-success {
+            background: #E8F5E9;
+            color: var(--success);
+        }
+
+        .badge-info {
+            background: #E1F5FE;
+            color: var(--info);
+        }
+
+        .badge-warning {
+            background: #FFF3E0;
+            color: var(--warning);
+        }
+
+        .port-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .port-card {
+            padding: 14px;
+            background: #F8FAFB;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .port-name {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .port-details {
+            font-size: 11px;
+            color: var(--text-secondary);
+            margin-top: 4px;
+        }
+
+        .port-status {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #E0E0E0;
+        }
+
+        .port-status.connected {
+            background: var(--success);
+            box-shadow: 0 0 8px rgba(0, 200, 83, 0.4);
+        }
+
+        .toast {
+            position: fixed;
+            bottom: 110px;
+            left: 50%;
+            transform: translateX(-50%) translateY(100px);
+            padding: 14px 28px;
+            background: rgba(26, 26, 26, 0.95);
+            color: white;
+            border-radius: 8px;
+            font-weight: 500;
+            font-size: 13px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.24);
+            opacity: 0;
+            transition: all 0.3s;
+            z-index: 1000;
+        }
+
+        .toast.visible {
+            opacity: 1;
+            transform: translateX(-50%) translateY(0);
+        }
+
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #F5F7FA;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--primary);
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div class="app">
+        <!-- 헤더 -->
+        <div class="header">
+            <div class="header-left">
+                <img src="assets/keti.png" alt="KETI" class="logo" onerror="this.style.display='none'">
+                <div class="title-group">
+                    <h1>Automotive TSN Network Designer</h1>
+                    <p>LAN9662 · Time-Sensitive Networking · IEEE 802.1</p>
+                </div>
+            </div>
+            <div class="stats">
+                <div class="stat">
+                    <div class="stat-value" id="deviceCount">0</div>
+                    <div class="stat-label">Devices</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-value" id="linkCount">0</div>
+                    <div class="stat-label">Links</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-value" id="totalBandwidth">0</div>
+                    <div class="stat-label">Mbps</div>
+                </div>
+            </div>
+            <div class="header-actions">
+                <button class="btn btn-secondary" id="layoutBtn">⚡ Auto Layout</button>
+                <button class="btn btn-secondary" id="saveBtn">💾 Save</button>
+                <button class="btn btn-primary" id="exportBtn">📤 Export</button>
+            </div>
+        </div>
+
+        <!-- 메인 -->
+        <div class="main">
+            <!-- 사이드바 -->
+            <div class="sidebar">
+                <div class="sidebar-section">
+                    <div class="section-title">TSN Network Devices</div>
+                    <div class="device-grid">
+                        <!-- LAN9662 Switch -->
+                        <div class="device-card" data-type="lan9662">
+                            <div class="device-icon-container">
+                                <svg viewBox="0 0 64 64" fill="none">
+                                    <rect x="8" y="20" width="48" height="24" rx="2" fill="#0066FF" opacity="0.2"/>
+                                    <rect x="10" y="18" width="44" height="24" rx="2" fill="#0066FF"/>
+                                    <circle cx="18" cy="30" r="2" fill="white"/>
+                                    <circle cx="26" cy="30" r="2" fill="white"/>
+                                    <circle cx="34" cy="30" r="2" fill="white"/>
+                                    <circle cx="42" cy="30" r="2" fill="white"/>
+                                    <circle cx="50" cy="30" r="2" fill="white"/>
+                                    <rect x="14" y="24" width="36" height="2" rx="1" fill="white" opacity="0.5"/>
+                                    <rect x="14" y="34" width="36" height="2" rx="1" fill="white" opacity="0.5"/>
+                                </svg>
+                            </div>
+                            <div class="device-details">
+                                <div class="device-name">LAN9662 TSN Switch</div>
+                                <div class="device-specs">8× 1000BASE-T1 Ports<br>IEEE 802.1Qbv/Qav/Qbu</div>
+                                <span class="device-badge badge-automotive">Automotive</span>
+                            </div>
+                        </div>
+
+                        <!-- Camera -->
+                        <div class="device-card" data-type="camera">
+                            <div class="device-icon-container">
+                                <svg viewBox="0 0 64 64" fill="none">
+                                    <rect x="16" y="24" width="32" height="20" rx="3" fill="#00BCD4"/>
+                                    <circle cx="38" cy="34" r="6" fill="white" opacity="0.8"/>
+                                    <circle cx="38" cy="34" r="3" fill="#00BCD4"/>
+                                    <rect x="20" y="20" width="4" height="4" rx="1" fill="#00BCD4"/>
+                                </svg>
+                            </div>
+                            <div class="device-details">
+                                <div class="device-name">Camera Sensor</div>
+                                <div class="device-specs">100BASE-T1 · ~100 Mbps<br>VLAN Priority 5-7</div>
+                                <span class="device-badge badge-automotive">Automotive</span>
+                            </div>
+                        </div>
+
+                        <!-- LiDAR -->
+                        <div class="device-card" data-type="lidar">
+                            <div class="device-icon-container">
+                                <svg viewBox="0 0 64 64" fill="none">
+                                    <circle cx="32" cy="32" r="14" fill="#00C853" opacity="0.2"/>
+                                    <circle cx="32" cy="32" r="10" fill="#00C853"/>
+                                    <line x1="32" y1="22" x2="32" y2="16" stroke="white" stroke-width="2"/>
+                                    <line x1="32" y1="42" x2="32" y2="48" stroke="white" stroke-width="2"/>
+                                    <line x1="22" y1="32" x2="16" y2="32" stroke="white" stroke-width="2"/>
+                                    <line x1="42" y1="32" x2="48" y2="32" stroke="white" stroke-width="2"/>
+                                </svg>
+                            </div>
+                            <div class="device-details">
+                                <div class="device-name">LiDAR Sensor</div>
+                                <div class="device-specs">1000BASE-T1 · ~500-1000 Mbps<br>VLAN Priority 6-7</div>
+                                <span class="device-badge badge-automotive">Automotive</span>
+                            </div>
+                        </div>
+
+                        <!-- Radar -->
+                        <div class="device-card" data-type="radar">
+                            <div class="device-icon-container">
+                                <svg viewBox="0 0 64 64" fill="none">
+                                    <path d="M 32 40 L 20 48 L 44 48 Z" fill="#FF9800"/>
+                                    <circle cx="32" cy="40" r="3" fill="white"/>
+                                    <path d="M 32 40 Q 20 28 20 20" stroke="#FF9800" stroke-width="2" fill="none" opacity="0.5"/>
+                                    <path d="M 32 40 Q 44 28 44 20" stroke="#FF9800" stroke-width="2" fill="none" opacity="0.5"/>
+                                </svg>
+                            </div>
+                            <div class="device-details">
+                                <div class="device-name">Radar Sensor</div>
+                                <div class="device-specs">100BASE-T1 · ~50-100 Mbps<br>VLAN Priority 5-6</div>
+                                <span class="device-badge badge-automotive">Automotive</span>
+                            </div>
+                        </div>
+
+                        <!-- ECU -->
+                        <div class="device-card" data-type="ecu">
+                            <div class="device-icon-container">
+                                <svg viewBox="0 0 64 64" fill="none">
+                                    <rect x="18" y="22" width="28" height="20" rx="2" fill="#8B5CF6"/>
+                                    <rect x="22" y="26" width="8" height="6" rx="1" fill="white" opacity="0.7"/>
+                                    <rect x="22" y="34" width="8" height="2" rx="1" fill="white" opacity="0.5"/>
+                                    <rect x="34" y="26" width="8" height="2" rx="1" fill="white" opacity="0.5"/>
+                                    <rect x="34" y="30" width="8" height="2" rx="1" fill="white" opacity="0.5"/>
+                                    <rect x="34" y="34" width="8" height="2" rx="1" fill="white" opacity="0.5"/>
+                                </svg>
+                            </div>
+                            <div class="device-details">
+                                <div class="device-name">ECU Controller</div>
+                                <div class="device-specs">100/1000BASE-T1 · 2 Ports<br>Control & Processing</div>
+                                <span class="device-badge badge-automotive">Automotive</span>
+                            </div>
+                        </div>
+
+                        <!-- Gateway -->
+                        <div class="device-card" data-type="gateway">
+                            <div class="device-icon-container">
+                                <svg viewBox="0 0 64 64" fill="none">
+                                    <rect x="20" y="26" width="24" height="12" rx="2" fill="#F57C00"/>
+                                    <polygon points="32,18 40,26 24,26" fill="#F57C00" opacity="0.6"/>
+                                    <circle cx="26" cy="32" r="2" fill="white"/>
+                                    <circle cx="32" cy="32" r="2" fill="white"/>
+                                    <circle cx="38" cy="32" r="2" fill="white"/>
+                                </svg>
+                            </div>
+                            <div class="device-details">
+                                <div class="device-name">Gateway Bridge</div>
+                                <div class="device-specs">4× 1000BASE-T1 Ports<br>Protocol Translation</div>
+                                <span class="device-badge badge-automotive">Automotive</span>
+                            </div>
+                        </div>
+
+                        <!-- Server -->
+                        <div class="device-card" data-type="server">
+                            <div class="device-icon-container">
+                                <svg viewBox="0 0 64 64" fill="none">
+                                    <rect x="18" y="20" width="28" height="6" rx="1" fill="#E91E63"/>
+                                    <rect x="18" y="29" width="28" height="6" rx="1" fill="#E91E63"/>
+                                    <rect x="18" y="38" width="28" height="6" rx="1" fill="#E91E63"/>
+                                    <circle cx="22" cy="23" r="1.5" fill="white"/>
+                                    <circle cx="22" cy="32" r="1.5" fill="white"/>
+                                    <circle cx="22" cy="41" r="1.5" fill="white"/>
+                                </svg>
+                            </div>
+                            <div class="device-details">
+                                <div class="device-name">Edge Server</div>
+                                <div class="device-specs">1000BASE-T · 2 Ports<br>Data Processing</div>
+                                <span class="device-badge badge-industrial">Industrial</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="sidebar-section">
+                    <div class="section-title">Tools</div>
+                    <div class="device-grid">
+                        <div class="device-card" id="connectBtn" style="cursor: pointer;">
+                            <div class="device-icon-container">
+                                <svg viewBox="0 0 64 64" fill="none">
+                                    <circle cx="20" cy="32" r="6" fill="#0066FF"/>
+                                    <circle cx="44" cy="32" r="6" fill="#0066FF"/>
+                                    <line x1="26" y1="32" x2="38" y2="32" stroke="#0066FF" stroke-width="3"/>
+                                </svg>
+                            </div>
+                            <div class="device-details">
+                                <div class="device-name">Connect Mode</div>
+                                <div class="device-specs">Link devices together</div>
+                            </div>
+                        </div>
+
+                        <div class="device-card" id="clearBtn" style="cursor: pointer;">
+                            <div class="device-icon-container">
+                                <svg viewBox="0 0 64 64" fill="none">
+                                    <path d="M 20 24 L 44 48 M 44 24 L 20 48" stroke="#F44336" stroke-width="3" stroke-linecap="round"/>
+                                </svg>
+                            </div>
+                            <div class="device-details">
+                                <div class="device-name">Clear All</div>
+                                <div class="device-specs">Remove all devices</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 캔버스 -->
+            <div class="canvas">
+                <div id="cy"></div>
+
+                <!-- 플로팅 컨트롤 -->
+                <div class="floating-controls">
+                    <div class="control-btn" id="zoomInBtn" title="Zoom In">➕</div>
+                    <div class="control-btn" id="zoomOutBtn" title="Zoom Out">➖</div>
+                    <div class="control-btn" id="fitBtn" title="Fit View">⬜</div>
+                    <div class="control-btn" id="deleteBtn" title="Delete">🗑</div>
+                </div>
+            </div>
+
+            <!-- 프로퍼티 패널 -->
+            <div class="properties" id="properties">
+                <div class="properties-header">
+                    <div class="properties-title">Device Properties</div>
+                    <button class="close-btn" id="closeBtn">✕</button>
+                </div>
+                <div class="properties-content" id="propertiesContent">
+                    <p style="color: var(--text-secondary); text-align: center; padding: 60px 24px; line-height: 1.8;">
+                        Select a device or link<br>to view properties
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 토스트 -->
+    <div class="toast" id="toast"></div>
+
+    <script>
+        // 장치 템플릿 - 실제 automotive TSN 스펙
+        const templates = {
+            lan9662: {
+                label: 'LAN9662',
+                ports: 8,
+                color: '#0066FF',
+                shape: 'roundrectangle',
+                bandwidth: 1000,
+                portType: '1000BASE-T1'
+            },
+            camera: {
+                label: 'Camera',
+                ports: 1,
+                color: '#00BCD4',
+                shape: 'ellipse',
+                bandwidth: 100,
+                portType: '100BASE-T1',
+                defaultVlan: 5,
+                defaultPriority: 6
+            },
+            lidar: {
+                label: 'LiDAR',
+                ports: 1,
+                color: '#00C853',
+                shape: 'diamond',
+                bandwidth: 500,
+                portType: '1000BASE-T1',
+                defaultVlan: 10,
+                defaultPriority: 7
+            },
+            radar: {
+                label: 'Radar',
+                ports: 1,
+                color: '#FF9800',
+                shape: 'triangle',
+                bandwidth: 75,
+                portType: '100BASE-T1',
+                defaultVlan: 5,
+                defaultPriority: 5
+            },
+            ecu: {
+                label: 'ECU',
+                ports: 2,
+                color: '#8B5CF6',
+                shape: 'roundrectangle',
+                bandwidth: 100,
+                portType: '100BASE-T1'
+            },
+            gateway: {
+                label: 'Gateway',
+                ports: 4,
+                color: '#F57C00',
+                shape: 'hexagon',
+                bandwidth: 1000,
+                portType: '1000BASE-T1'
+            },
+            server: {
+                label: 'Server',
+                ports: 2,
+                color: '#E91E63',
+                shape: 'barrel',
+                bandwidth: 1000,
+                portType: '1000BASE-T'
+            }
+        };
+
+        // Cytoscape 초기화
+        const cy = cytoscape({
+            container: document.getElementById('cy'),
+
+            style: [
+                {
+                    selector: 'node',
+                    style: {
+                        'shape': 'data(shape)',
+                        'background-color': 'data(color)',
+                        'label': 'data(label)',
+                        'width': 100,
+                        'height': 100,
+                        'text-valign': 'bottom',
+                        'text-halign': 'center',
+                        'text-margin-y': 12,
+                        'font-size': 15,
+                        'font-weight': '700',
+                        'color': '#ffffff',
+                        'text-outline-width': 5,
+                        'text-outline-color': 'data(color)',
+                        'border-width': 5,
+                        'border-color': '#ffffff',
+                        'border-opacity': 0.9,
+                        'overlay-padding': 12,
+                        'transition-property': 'background-color, border-color, width, height',
+                        'transition-duration': '0.2s'
+                    }
+                },
+                {
+                    selector: 'node:selected',
+                    style: {
+                        'border-width': 7,
+                        'border-color': '#FFD700',
+                        'width': 110,
+                        'height': 110
+                    }
+                },
+                {
+                    selector: 'edge',
+                    style: {
+                        'width': 6,
+                        'line-color': '#ffffff',
+                        'opacity': 0.7,
+                        'curve-style': 'bezier',
+                        'target-arrow-shape': 'triangle',
+                        'target-arrow-color': '#ffffff',
+                        'arrow-scale': 1.8,
+                        'label': 'data(linkType)',
+                        'font-size': 12,
+                        'font-weight': '600',
+                        'color': '#ffffff',
+                        'text-outline-width': 3,
+                        'text-outline-color': '#0066FF',
+                        'text-background-color': '#0066FF',
+                        'text-background-opacity': 0.8,
+                        'text-background-padding': 4,
+                        'text-background-shape': 'roundrectangle'
+                    }
+                },
+                {
+                    selector: 'edge:selected',
+                    style: {
+                        'line-color': '#FFD700',
+                        'target-arrow-color': '#FFD700',
+                        'width': 8,
+                        'opacity': 1
+                    }
+                },
+                {
+                    selector: '.t1-100',
+                    style: {
+                        'line-color': '#00BCD4',
+                        'target-arrow-color': '#00BCD4'
+                    }
+                },
+                {
+                    selector: '.t1-1000',
+                    style: {
+                        'line-color': '#00C853',
+                        'target-arrow-color': '#00C853'
+                    }
+                }
+            ],
+
+            layout: { name: 'preset' },
+            userZoomingEnabled: true,
+            userPanningEnabled: true,
+            boxSelectionEnabled: true
+        });
+
+        let deviceCounter = 1;
+        let connectionMode = false;
+        let selectedSource = null;
+        let deviceData = new Map();
+
+        // 통계 업데이트
+        function updateStats() {
+            document.getElementById('deviceCount').textContent = cy.nodes().length;
+            document.getElementById('linkCount').textContent = cy.edges().length;
+
+            let totalBw = 0;
+            cy.edges().forEach(edge => {
+                const bw = parseInt(edge.data('bandwidth')) || 0;
+                totalBw += bw;
+            });
+            document.getElementById('totalBandwidth').textContent = totalBw;
+        }
+
+        // 토스트
+        function showToast(msg) {
+            const toast = document.getElementById('toast');
+            toast.textContent = msg;
+            toast.classList.add('visible');
+            setTimeout(() => toast.classList.remove('visible'), 2500);
+        }
+
+        // 장치 추가
+        document.querySelectorAll('.device-card[data-type]').forEach(card => {
+            card.addEventListener('click', () => addDevice(card.dataset.type));
+        });
+
+        function addDevice(type) {
+            const template = templates[type];
+            const id = `device-${deviceCounter++}`;
+            const label = `${template.label}-${deviceCounter - 1}`;
+
+            const ports = [];
+            for (let i = 0; i < template.ports; i++) {
+                ports.push({
+                    id: `${id}-port-${i}`,
+                    number: i,
+                    type: template.portType,
+                    speed: template.bandwidth + 'Mbps',
+                    vlan: template.defaultVlan || 1,
+                    priority: template.defaultPriority || 0,
+                    connected: false
+                });
+            }
+
+            deviceData.set(id, {
+                type: type,
+                label: label,
+                ports: ports,
+                bandwidth: template.bandwidth
+            });
+
+            cy.add({
+                group: 'nodes',
+                data: {
+                    id: id,
+                    label: label,
+                    type: type,
+                    color: template.color,
+                    shape: template.shape,
+                    portType: template.portType
+                },
+                position: {
+                    x: Math.random() * 700 + 250,
+                    y: Math.random() * 400 + 150
+                }
+            });
+
+            updateStats();
+            showToast(`${template.label} added`);
+        }
+
+        // 이벤트
+        cy.on('tap', 'node', function(evt) {
+            const node = evt.target;
+
+            if (connectionMode) {
+                if (!selectedSource) {
+                    selectedSource = node;
+                    node.style('border-color', '#FFD700');
+                    showToast('Select target device');
+                } else if (selectedSource.id() !== node.id()) {
+                    const sourceData = deviceData.get(selectedSource.id());
+                    const targetData = deviceData.get(node.id());
+
+                    // 대역폭 계산 (작은 쪽으로)
+                    const bandwidth = Math.min(sourceData.bandwidth, targetData.bandwidth);
+
+                    // 링크 타입 결정
+                    let linkType = '';
+                    if (bandwidth >= 1000) {
+                        linkType = '1000BASE-T1';
+                    } else if (bandwidth >= 100) {
+                        linkType = '100BASE-T1';
+                    } else {
+                        linkType = '10BASE-T1';
+                    }
+
+                    const edgeClass = bandwidth >= 1000 ? 't1-1000' : 't1-100';
+
+                    cy.add({
+                        group: 'edges',
+                        data: {
+                            id: `edge-${selectedSource.id()}-${node.id()}`,
+                            source: selectedSource.id(),
+                            target: node.id(),
+                            bandwidth: bandwidth,
+                            linkType: linkType,
+                            vlan: 1
+                        },
+                        classes: edgeClass
+                    });
+
+                    selectedSource.style('border-color', '#ffffff');
+                    selectedSource = null;
+                    updateStats();
+                    showToast(`Connected: ${linkType} @ ${bandwidth}Mbps`);
+                }
+            } else {
+                showNodeProperties(node);
+            }
+        });
+
+        cy.on('tap', 'edge', function(evt) {
+            showEdgeProperties(evt.target);
+        });
+
+        // 프로퍼티 표시
+        function showNodeProperties(node) {
+            const nodeId = node.id();
+            const data = deviceData.get(nodeId);
+            const template = templates[data.type];
+
+            document.getElementById('propertiesContent').innerHTML = `
+                <div class="prop-section">
+                    <div class="prop-section-title">Device Information</div>
+                    <div class="form-group">
+                        <label class="form-label">Device Name</label>
+                        <input type="text" class="form-input" value="${data.label}"
+                            onchange="updateNodeLabel('${nodeId}', this.value)">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Device Type</label>
+                        <input type="text" class="form-input" value="${template.label}" readonly>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Port Type</label>
+                        <input type="text" class="form-input" value="${template.portType}" readonly>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Bandwidth</label>
+                        <input type="text" class="form-input" value="${template.bandwidth} Mbps" readonly>
+                    </div>
+                    <div>
+                        <span class="badge badge-success">Active</span>
+                        <span class="badge badge-info">${template.portType}</span>
+                    </div>
+                </div>
+
+                <div class="prop-section">
+                    <div class="prop-section-title">Port Configuration (${data.ports.length})</div>
+                    <div class="port-list">
+                        ${data.ports.map(port => `
+                            <div class="port-card">
+                                <div>
+                                    <div class="port-name">Port ${port.number}</div>
+                                    <div class="port-details">${port.type} · ${port.speed} · VLAN ${port.vlan} · Prio ${port.priority}</div>
+                                </div>
+                                <div class="port-status ${port.connected ? 'connected' : ''}"></div>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            `;
+
+            document.getElementById('properties').classList.add('visible');
+        }
+
+        function showEdgeProperties(edge) {
+            const data = edge.data();
+            const source = cy.getElementById(data.source);
+            const target = cy.getElementById(data.target);
+
+            document.getElementById('propertiesContent').innerHTML = `
+                <div class="prop-section">
+                    <div class="prop-section-title">Link Information</div>
+                    <div class="form-group">
+                        <label class="form-label">Source Device</label>
+                        <input type="text" class="form-input" value="${source.data('label')}" readonly>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Target Device</label>
+                        <input type="text" class="form-input" value="${target.data('label')}" readonly>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Link Type</label>
+                        <input type="text" class="form-input" value="${data.linkType}" readonly>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Bandwidth</label>
+                        <input type="text" class="form-input" value="${data.bandwidth} Mbps" readonly>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">VLAN ID</label>
+                        <input type="number" class="form-input" value="${data.vlan || 1}" min="1" max="4094"
+                            onchange="updateEdgeVLAN('${edge.id()}', this.value)">
+                    </div>
+                    <div>
+                        <span class="badge badge-success">Active</span>
+                        <span class="badge badge-info">${data.linkType}</span>
+                        <span class="badge badge-warning">${data.bandwidth} Mbps</span>
+                    </div>
+                </div>
+            `;
+
+            document.getElementById('properties').classList.add('visible');
+        }
+
+        // 업데이트 함수
+        window.updateNodeLabel = (id, label) => {
+            cy.getElementById(id).data('label', label);
+            deviceData.get(id).label = label;
+        };
+
+        window.updateEdgeVLAN = (id, vlan) => {
+            cy.getElementById(id).data('vlan', parseInt(vlan));
+        };
+
+        // 버튼 이벤트
+        document.getElementById('connectBtn').addEventListener('click', function() {
+            connectionMode = !connectionMode;
+            this.style.borderColor = connectionMode ? '#0066FF' : '#E0E0E0';
+            this.style.background = connectionMode ? 'rgba(0, 102, 255, 0.05)' : 'white';
+            showToast(connectionMode ? 'Connect mode ON' : 'Connect mode OFF');
+            if (!connectionMode && selectedSource) {
+                selectedSource.style('border-color', '#ffffff');
+                selectedSource = null;
+            }
+        });
+
+        document.getElementById('layoutBtn').addEventListener('click', () => {
+            cy.layout({
+                name: 'circle',
+                animate: true,
+                animationDuration: 600,
+                animationEasing: 'ease-out'
+            }).run();
+            showToast('Auto layout applied');
+        });
+
+        document.getElementById('clearBtn').addEventListener('click', () => {
+            if (confirm('Clear all devices and connections?')) {
+                cy.elements().remove();
+                deviceData.clear();
+                deviceCounter = 1;
+                updateStats();
+                showToast('All cleared');
+            }
+        });
+
+        document.getElementById('deleteBtn').addEventListener('click', () => {
+            const selected = cy.$(':selected');
+            if (selected.length > 0) {
+                selected.forEach(ele => {
+                    if (ele.isNode()) deviceData.delete(ele.id());
+                });
+                selected.remove();
+                updateStats();
+                showToast('Deleted');
+            }
+        });
+
+        document.getElementById('closeBtn').addEventListener('click', () => {
+            document.getElementById('properties').classList.remove('visible');
+        });
+
+        document.getElementById('zoomInBtn').addEventListener('click', () => {
+            cy.zoom(cy.zoom() * 1.2);
+            cy.center();
+        });
+
+        document.getElementById('zoomOutBtn').addEventListener('click', () => {
+            cy.zoom(cy.zoom() * 0.8);
+            cy.center();
+        });
+
+        document.getElementById('fitBtn').addEventListener('click', () => {
+            cy.fit(null, 50);
+        });
+
+        document.getElementById('exportBtn').addEventListener('click', () => {
+            const data = {
+                metadata: {
+                    version: '1.0',
+                    created: new Date().toISOString(),
+                    type: 'Automotive TSN Network'
+                },
+                nodes: cy.nodes().map(n => ({
+                    id: n.id(),
+                    data: n.data(),
+                    position: n.position(),
+                    deviceData: deviceData.get(n.id())
+                })),
+                edges: cy.edges().map(e => e.data())
+            };
+
+            const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `tsn-automotive-network-${Date.now()}.json`;
+            a.click();
+            showToast('Exported to JSON');
+        });
+
+        // 초기 샘플 네트워크
+        setTimeout(() => {
+            // LAN9662 스위치
+            addDevice('lan9662');
+
+            // 센서들
+            addDevice('camera');
+            addDevice('lidar');
+            addDevice('radar');
+
+            // ECU
+            addDevice('ecu');
+
+            setTimeout(() => {
+                cy.layout({
+                    name: 'circle',
+                    animate: true,
+                    animationDuration: 800
+                }).run();
+            }, 200);
+        }, 100);
+    </script>
+</body>
+</html>

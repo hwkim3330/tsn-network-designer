@@ -1,0 +1,1041 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LAN9662 TSN Network Designer</title>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.28.1/cytoscape.min.js"></script>
+
+    <style>
+        :root {
+            --primary: #0066FF;
+            --primary-dark: #0052CC;
+            --primary-light: #4D94FF;
+            --success: #00C853;
+            --warning: #FF9800;
+            --danger: #F44336;
+            --bg-main: #F5F7FA;
+            --text-primary: #1A1A1A;
+            --text-secondary: #666666;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: linear-gradient(135deg, #0066FF 0%, #00BCD4 100%);
+            overflow: hidden;
+        }
+
+        .app {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+
+        /* 헤더 */
+        .header {
+            height: 72px;
+            background: rgba(255, 255, 255, 0.98);
+            backdrop-filter: blur(20px);
+            border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 32px;
+            box-shadow: 0 2px 12px rgba(0, 102, 255, 0.08);
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 24px;
+        }
+
+        .logo {
+            height: 48px;
+        }
+
+        .title-group h1 {
+            font-size: 20px;
+            font-weight: 700;
+            color: var(--primary);
+            margin-bottom: 4px;
+        }
+
+        .title-group p {
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+
+        .stats {
+            display: flex;
+            gap: 32px;
+        }
+
+        .stat {
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 24px;
+            font-weight: 700;
+            color: var(--primary);
+        }
+
+        .stat-label {
+            font-size: 11px;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            margin-top: 4px;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            border-radius: 8px;
+            border: none;
+            font-weight: 600;
+            cursor: pointer;
+            font-size: 13px;
+            font-family: inherit;
+            background: var(--primary);
+            color: white;
+            transition: all 0.2s;
+        }
+
+        .btn:hover {
+            background: var(--primary-dark);
+            transform: translateY(-1px);
+        }
+
+        /* 메인 */
+        .main {
+            flex: 1;
+            display: flex;
+            overflow: hidden;
+        }
+
+        /* 사이드바 */
+        .sidebar {
+            width: 380px;
+            background: rgba(255, 255, 255, 0.98);
+            border-right: 1px solid rgba(0, 0, 0, 0.1);
+            overflow-y: auto;
+        }
+
+        .sidebar-section {
+            padding: 24px;
+            border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+        }
+
+        .section-title {
+            font-size: 11px;
+            font-weight: 700;
+            color: var(--primary);
+            text-transform: uppercase;
+            letter-spacing: 1.2px;
+            margin-bottom: 20px;
+        }
+
+        .device-card {
+            background: white;
+            border: 2px solid #E0E0E0;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .device-card:hover {
+            border-color: var(--primary);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 16px rgba(0, 102, 255, 0.12);
+        }
+
+        .device-header {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            margin-bottom: 12px;
+        }
+
+        .device-icon {
+            width: 64px;
+            height: 64px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, rgba(0, 102, 255, 0.1) 0%, rgba(0, 188, 212, 0.1) 100%);
+            border-radius: 12px;
+        }
+
+        .device-info h3 {
+            font-size: 16px;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin-bottom: 4px;
+        }
+
+        .device-info p {
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+
+        .device-specs {
+            background: #F8FAFB;
+            padding: 12px;
+            border-radius: 8px;
+            font-size: 12px;
+            line-height: 1.6;
+            color: var(--text-secondary);
+        }
+
+        .port-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 8px;
+            margin-top: 12px;
+        }
+
+        .port-indicator {
+            padding: 8px;
+            background: #F0F0F0;
+            border-radius: 6px;
+            text-align: center;
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--text-secondary);
+        }
+
+        .port-indicator.active {
+            background: linear-gradient(135deg, var(--primary) 0%, #00BCD4 100%);
+            color: white;
+        }
+
+        /* 캔버스 */
+        .canvas {
+            flex: 1;
+            position: relative;
+        }
+
+        #cy {
+            width: 100%;
+            height: 100%;
+            background: radial-gradient(circle at 30% 50%, rgba(255, 255, 255, 0.1) 0%, transparent 50%);
+        }
+
+        .floating-controls {
+            position: absolute;
+            bottom: 32px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 12px;
+            background: rgba(255, 255, 255, 0.98);
+            padding: 12px;
+            border-radius: 12px;
+            box-shadow: 0 4px 24px rgba(0, 0, 0, 0.12);
+        }
+
+        .control-btn {
+            width: 48px;
+            height: 48px;
+            border-radius: 10px;
+            background: white;
+            border: 2px solid #E0E0E0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 20px;
+        }
+
+        .control-btn:hover {
+            background: var(--primary);
+            border-color: var(--primary);
+            color: white;
+        }
+
+        /* 프로퍼티 패널 */
+        .properties {
+            width: 440px;
+            background: rgba(255, 255, 255, 0.98);
+            border-left: 1px solid rgba(0, 0, 0, 0.1);
+            transform: translateX(100%);
+            transition: transform 0.3s;
+            position: absolute;
+            right: 0;
+            top: 0;
+            height: 100%;
+            z-index: 50;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .properties.visible {
+            transform: translateX(0);
+        }
+
+        .properties-header {
+            height: 72px;
+            padding: 0 24px;
+            border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .properties-title {
+            font-size: 16px;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+
+        .close-btn {
+            width: 36px;
+            height: 36px;
+            border-radius: 8px;
+            background: transparent;
+            border: none;
+            cursor: pointer;
+            font-size: 18px;
+            color: var(--text-secondary);
+        }
+
+        .properties-content {
+            padding: 24px;
+            overflow-y: auto;
+            flex: 1;
+        }
+
+        .prop-section {
+            margin-bottom: 28px;
+        }
+
+        .prop-title {
+            font-size: 11px;
+            font-weight: 700;
+            color: var(--primary);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 16px;
+        }
+
+        .form-group {
+            margin-bottom: 16px;
+        }
+
+        .form-label {
+            display: block;
+            font-size: 12px;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        .form-input {
+            width: 100%;
+            padding: 10px 14px;
+            border: 2px solid #E0E0E0;
+            border-radius: 8px;
+            font-size: 13px;
+            font-family: inherit;
+        }
+
+        .form-input:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 600;
+            margin-right: 6px;
+        }
+
+        .badge-success { background: #E8F5E9; color: var(--success); }
+        .badge-info { background: #E1F5FE; color: #0066FF; }
+        .badge-warning { background: #FFF3E0; color: var(--warning); }
+
+        .port-detail-card {
+            padding: 16px;
+            background: #F8FAFB;
+            border: 1px solid #E0E0E0;
+            border-radius: 8px;
+            margin-bottom: 10px;
+        }
+
+        .port-detail-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+
+        .port-detail-name {
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        .port-detail-status {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #E0E0E0;
+        }
+
+        .port-detail-status.connected {
+            background: var(--success);
+            box-shadow: 0 0 8px rgba(0, 200, 83, 0.4);
+        }
+
+        .port-detail-info {
+            font-size: 12px;
+            color: var(--text-secondary);
+            line-height: 1.6;
+        }
+
+        .toast {
+            position: fixed;
+            bottom: 110px;
+            left: 50%;
+            transform: translateX(-50%) translateY(100px);
+            padding: 14px 28px;
+            background: rgba(26, 26, 26, 0.95);
+            color: white;
+            border-radius: 8px;
+            font-weight: 500;
+            font-size: 13px;
+            opacity: 0;
+            transition: all 0.3s;
+            z-index: 1000;
+        }
+
+        .toast.visible {
+            opacity: 1;
+            transform: translateX(-50%) translateY(0);
+        }
+
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #F5F7FA; }
+        ::-webkit-scrollbar-thumb { background: var(--primary); border-radius: 4px; }
+    </style>
+</head>
+<body>
+    <div class="app">
+        <div class="header">
+            <div class="header-left">
+                <img src="assets/keti.png" alt="KETI" class="logo" onerror="this.style.display='none'">
+                <div class="title-group">
+                    <h1>LAN9662 TSN Network Designer</h1>
+                    <p>8-Port Gigabit TSN Switch · IEEE 802.1Qbv/Qav/Qbu · PTP</p>
+                </div>
+            </div>
+            <div class="stats">
+                <div class="stat">
+                    <div class="stat-value" id="deviceCount">0</div>
+                    <div class="stat-label">Devices</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-value" id="linkCount">0</div>
+                    <div class="stat-label">Links</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-value" id="bandwidth">0</div>
+                    <div class="stat-label">Gbps</div>
+                </div>
+            </div>
+            <div>
+                <button class="btn" id="exportBtn">📤 Export Config</button>
+            </div>
+        </div>
+
+        <div class="main">
+            <div class="sidebar">
+                <div class="sidebar-section">
+                    <div class="section-title">Microchip TSN Switches</div>
+
+                    <!-- LAN9662 -->
+                    <div class="device-card" data-type="lan9662">
+                        <div class="device-header">
+                            <div class="device-icon">
+                                <svg width="48" height="48" viewBox="0 0 64 64" fill="none">
+                                    <rect x="4" y="16" width="56" height="32" rx="3" fill="#0066FF" opacity="0.15"/>
+                                    <rect x="6" y="14" width="52" height="32" rx="3" fill="#0066FF"/>
+                                    <g id="ports">
+                                        <circle cx="14" cy="22" r="2.5" fill="white"/>
+                                        <circle cx="22" cy="22" r="2.5" fill="white"/>
+                                        <circle cx="30" cy="22" r="2.5" fill="white"/>
+                                        <circle cx="38" cy="22" r="2.5" fill="white"/>
+                                        <circle cx="46" cy="22" r="2.5" fill="white"/>
+                                        <circle cx="54" cy="22" r="2.5" fill="white"/>
+                                    </g>
+                                    <rect x="10" y="30" width="44" height="2" rx="1" fill="white" opacity="0.6"/>
+                                    <rect x="10" y="34" width="44" height="2" rx="1" fill="white" opacity="0.6"/>
+                                    <rect x="10" y="38" width="28" height="2" rx="1" fill="white" opacity="0.4"/>
+                                </svg>
+                            </div>
+                            <div class="device-info">
+                                <h3>LAN9662 Switch</h3>
+                                <p>8-Port Gigabit TSN</p>
+                            </div>
+                        </div>
+                        <div class="device-specs">
+                            <strong>Physical Ports:</strong><br>
+                            • 7× MateNET (Industrial Ethernet, 1G)<br>
+                            • 4× SFP (Fiber, 1G)<br>
+                            • 1× RJ45 (Management)<br>
+                            <br>
+                            <strong>Total: 12 Ports</strong><br>
+                            <strong>TSN Features:</strong><br>
+                            • IEEE 802.1Qbv (TAS)<br>
+                            • IEEE 802.1Qav (CBS)<br>
+                            • IEEE 802.1Qbu (FP)<br>
+                            • IEEE 1588 PTP v2
+                        </div>
+                        <div class="port-grid" style="grid-template-columns: repeat(3, 1fr);">
+                            <div class="port-indicator" style="background: #1E88E5; color: white;">M0</div>
+                            <div class="port-indicator" style="background: #1E88E5; color: white;">M1</div>
+                            <div class="port-indicator" style="background: #1E88E5; color: white;">M2</div>
+                            <div class="port-indicator" style="background: #1E88E5; color: white;">M3</div>
+                            <div class="port-indicator" style="background: #1E88E5; color: white;">M4</div>
+                            <div class="port-indicator" style="background: #1E88E5; color: white;">M5</div>
+                            <div class="port-indicator" style="background: #1E88E5; color: white;">M6</div>
+                            <div class="port-indicator" style="background: #888; color: white;">SFP0</div>
+                            <div class="port-indicator" style="background: #888; color: white;">SFP1</div>
+                            <div class="port-indicator" style="background: #888; color: white;">SFP2</div>
+                            <div class="port-indicator" style="background: #888; color: white;">SFP3</div>
+                            <div class="port-indicator" style="background: #FF9800; color: white;">MGMT</div>
+                        </div>
+                    </div>
+
+                    <!-- LAN9692 -->
+                    <div class="device-card" data-type="lan9692" style="margin-top: 16px;">
+                        <div class="device-header">
+                            <div class="device-icon">
+                                <svg width="48" height="48" viewBox="0 0 64 64" fill="none">
+                                    <rect x="4" y="16" width="56" height="32" rx="3" fill="#00C853" opacity="0.15"/>
+                                    <rect x="6" y="14" width="52" height="32" rx="3" fill="#00C853"/>
+                                    <g id="ports-1g">
+                                        <circle cx="12" cy="22" r="2" fill="white"/>
+                                        <circle cx="19" cy="22" r="2" fill="white"/>
+                                        <circle cx="26" cy="22" r="2" fill="white"/>
+                                        <circle cx="33" cy="22" r="2" fill="white"/>
+                                        <circle cx="40" cy="22" r="2" fill="white"/>
+                                        <circle cx="47" cy="22" r="2" fill="white"/>
+                                    </g>
+                                    <g id="ports-10g">
+                                        <rect x="50" y="20" width="5" height="4" rx="1" fill="#FFD700"/>
+                                        <rect x="50" y="26" width="5" height="4" rx="1" fill="#FFD700"/>
+                                    </g>
+                                    <rect x="10" y="32" width="44" height="2" rx="1" fill="white" opacity="0.6"/>
+                                    <rect x="10" y="36" width="44" height="2" rx="1" fill="white" opacity="0.6"/>
+                                    <text x="52" y="43" fill="#FFD700" font-size="6" font-weight="bold">10G</text>
+                                </svg>
+                            </div>
+                            <div class="device-info">
+                                <h3>LAN9692 Switch</h3>
+                                <p>8+2 Port (10G) TSN</p>
+                            </div>
+                        </div>
+                        <div class="device-specs">
+                            <strong>Physical Ports:</strong><br>
+                            • 8× RJ45 (Copper, 1G)<br>
+                            • 2× SFP (Fiber, 1G)<br>
+                            • 2× SFP+ (Fiber, 10G) ⚡<br>
+                            <br>
+                            <strong>Total: 12 Ports</strong><br>
+                            <strong>TSN Features:</strong><br>
+                            • IEEE 802.1Qbv/Qav/Qbu<br>
+                            • IEEE 1588 PTP v2
+                        </div>
+                        <div class="port-grid" style="grid-template-columns: repeat(3, 1fr);">
+                            <div class="port-indicator" style="background: #333; color: white;">RJ45-0</div>
+                            <div class="port-indicator" style="background: #333; color: white;">RJ45-1</div>
+                            <div class="port-indicator" style="background: #333; color: white;">RJ45-2</div>
+                            <div class="port-indicator" style="background: #333; color: white;">RJ45-3</div>
+                            <div class="port-indicator" style="background: #333; color: white;">RJ45-4</div>
+                            <div class="port-indicator" style="background: #333; color: white;">RJ45-5</div>
+                            <div class="port-indicator" style="background: #333; color: white;">RJ45-6</div>
+                            <div class="port-indicator" style="background: #333; color: white;">RJ45-7</div>
+                            <div class="port-indicator" style="background: #888; color: white;">SFP-0</div>
+                            <div class="port-indicator" style="background: #888; color: white;">SFP-1</div>
+                            <div class="port-indicator" style="background: linear-gradient(135deg, #FFD700 0%, #FFA000 100%); color: white;">10G-0</div>
+                            <div class="port-indicator" style="background: linear-gradient(135deg, #FFD700 0%, #FFA000 100%); color: white;">10G-1</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="sidebar-section">
+                    <div class="section-title">TSN Endpoints</div>
+
+                    <div class="device-card" data-type="camera">
+                        <div class="device-header">
+                            <div class="device-icon">
+                                <svg width="40" height="40" viewBox="0 0 64 64" fill="none">
+                                    <rect x="14" y="22" width="36" height="24" rx="4" fill="#00BCD4"/>
+                                    <circle cx="38" cy="34" r="8" fill="white" opacity="0.9"/>
+                                    <circle cx="38" cy="34" r="4" fill="#00BCD4"/>
+                                    <rect x="18" y="18" width="6" height="4" rx="1" fill="#00BCD4"/>
+                                </svg>
+                            </div>
+                            <div class="device-info">
+                                <h3>Camera</h3>
+                                <p>Video Sensor</p>
+                            </div>
+                        </div>
+                        <div class="device-specs">
+                            100 Mbps · Priority 6 · VLAN 10
+                        </div>
+                    </div>
+
+                    <div class="device-card" data-type="lidar">
+                        <div class="device-header">
+                            <div class="device-icon">
+                                <svg width="40" height="40" viewBox="0 0 64 64" fill="none">
+                                    <circle cx="32" cy="32" r="16" fill="#00C853" opacity="0.2"/>
+                                    <circle cx="32" cy="32" r="12" fill="#00C853"/>
+                                    <line x1="32" y1="20" x2="32" y2="12" stroke="white" stroke-width="3"/>
+                                    <line x1="32" y1="44" x2="32" y2="52" stroke="white" stroke-width="3"/>
+                                    <line x1="20" y1="32" x2="12" y2="32" stroke="white" stroke-width="3"/>
+                                    <line x1="44" y1="32" x2="52" y2="32" stroke="white" stroke-width="3"/>
+                                </svg>
+                            </div>
+                            <div class="device-info">
+                                <h3>LiDAR</h3>
+                                <p>Range Sensor</p>
+                            </div>
+                        </div>
+                        <div class="device-specs">
+                            1000 Mbps · Priority 7 · VLAN 20
+                        </div>
+                    </div>
+
+                    <div class="device-card" data-type="radar">
+                        <div class="device-header">
+                            <div class="device-icon">
+                                <svg width="40" height="40" viewBox="0 0 64 64" fill="none">
+                                    <path d="M 32 42 L 18 52 L 46 52 Z" fill="#FF9800"/>
+                                    <circle cx="32" cy="42" r="4" fill="white"/>
+                                    <path d="M 32 42 Q 18 28 18 18" stroke="#FF9800" stroke-width="3" fill="none" opacity="0.6"/>
+                                    <path d="M 32 42 Q 46 28 46 18" stroke="#FF9800" stroke-width="3" fill="none" opacity="0.6"/>
+                                </svg>
+                            </div>
+                            <div class="device-info">
+                                <h3>Radar</h3>
+                                <p>Object Detection</p>
+                            </div>
+                        </div>
+                        <div class="device-specs">
+                            100 Mbps · Priority 5 · VLAN 15
+                        </div>
+                    </div>
+
+                    <div class="device-card" data-type="ecu">
+                        <div class="device-header">
+                            <div class="device-icon">
+                                <svg width="40" height="40" viewBox="0 0 64 64" fill="none">
+                                    <rect x="16" y="20" width="32" height="24" rx="3" fill="#8B5CF6"/>
+                                    <rect x="20" y="26" width="10" height="8" rx="1" fill="white" opacity="0.8"/>
+                                    <rect x="20" y="36" width="10" height="2" rx="1" fill="white" opacity="0.6"/>
+                                    <rect x="34" y="26" width="10" height="2" rx="1" fill="white" opacity="0.6"/>
+                                    <rect x="34" y="30" width="10" height="2" rx="1" fill="white" opacity="0.6"/>
+                                    <rect x="34" y="34" width="10" height="2" rx="1" fill="white" opacity="0.6"/>
+                                </svg>
+                            </div>
+                            <div class="device-info">
+                                <h3>ECU</h3>
+                                <p>Control Unit</p>
+                            </div>
+                        </div>
+                        <div class="device-specs">
+                            100 Mbps · Priority 4 · VLAN 5
+                        </div>
+                    </div>
+                </div>
+
+                <div class="sidebar-section">
+                    <div class="section-title">Network Tools</div>
+                    <div class="device-card" id="connectBtn">
+                        <div class="device-header">
+                            <div class="device-icon">
+                                <svg width="40" height="40" viewBox="0 0 64 64" fill="none">
+                                    <circle cx="18" cy="32" r="8" fill="#0066FF"/>
+                                    <circle cx="46" cy="32" r="8" fill="#0066FF"/>
+                                    <line x1="26" y1="32" x2="38" y2="32" stroke="#0066FF" stroke-width="4"/>
+                                </svg>
+                            </div>
+                            <div class="device-info">
+                                <h3>Connect Mode</h3>
+                                <p>Link devices</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="device-card" id="layoutBtn">
+                        <div class="device-header">
+                            <div class="device-icon">
+                                <svg width="40" height="40" viewBox="0 0 64 64" fill="none">
+                                    <circle cx="32" cy="16" r="6" fill="#0066FF"/>
+                                    <circle cx="16" cy="48" r="6" fill="#0066FF"/>
+                                    <circle cx="48" cy="48" r="6" fill="#0066FF"/>
+                                    <line x1="32" y1="22" x2="22" y2="42" stroke="#0066FF" stroke-width="3"/>
+                                    <line x1="32" y1="22" x2="42" y2="42" stroke="#0066FF" stroke-width="3"/>
+                                </svg>
+                            </div>
+                            <div class="device-info">
+                                <h3>Auto Layout</h3>
+                                <p>Organize network</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="canvas">
+                <div id="cy"></div>
+                <div class="floating-controls">
+                    <div class="control-btn" id="zoomInBtn">➕</div>
+                    <div class="control-btn" id="zoomOutBtn">➖</div>
+                    <div class="control-btn" id="fitBtn">⬜</div>
+                    <div class="control-btn" id="deleteBtn">🗑</div>
+                </div>
+            </div>
+
+            <div class="properties" id="properties">
+                <div class="properties-header">
+                    <div class="properties-title">Device Properties</div>
+                    <button class="close-btn" id="closeBtn">✕</button>
+                </div>
+                <div class="properties-content" id="propertiesContent">
+                    <p style="color: var(--text-secondary); text-align: center; padding: 60px 24px;">
+                        Select a device to view properties
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="toast" id="toast"></div>
+
+    <script>
+        const templates = {
+            lan9662: {
+                label: 'LAN9662',
+                ports: 12,
+                color: '#0066FF',
+                shape: 'roundrectangle',
+                portConfigs: [
+                    { num: 0, type: 'MateNET', speed: 1000 },
+                    { num: 1, type: 'MateNET', speed: 1000 },
+                    { num: 2, type: 'MateNET', speed: 1000 },
+                    { num: 3, type: 'MateNET', speed: 1000 },
+                    { num: 4, type: 'MateNET', speed: 1000 },
+                    { num: 5, type: 'MateNET', speed: 1000 },
+                    { num: 6, type: 'MateNET', speed: 1000 },
+                    { num: 7, type: 'SFP', speed: 1000 },
+                    { num: 8, type: 'SFP', speed: 1000 },
+                    { num: 9, type: 'SFP', speed: 1000 },
+                    { num: 10, type: 'SFP', speed: 1000 },
+                    { num: 11, type: 'MGMT RJ45', speed: 1000 }
+                ]
+            },
+            lan9692: {
+                label: 'LAN9692',
+                ports: 12,
+                color: '#00C853',
+                shape: 'roundrectangle',
+                portConfigs: [
+                    { num: 0, type: 'MateNET T1', speed: 1000 },
+                    { num: 1, type: 'MateNET T1', speed: 1000 },
+                    { num: 2, type: 'MateNET T1', speed: 1000 },
+                    { num: 3, type: 'MateNET T1', speed: 1000 },
+                    { num: 4, type: 'MateNET T1', speed: 1000 },
+                    { num: 5, type: 'MateNET T1', speed: 1000 },
+                    { num: 6, type: 'MateNET T1', speed: 1000 },
+                    { num: 7, type: 'SFP+', speed: 10000 },
+                    { num: 8, type: 'SFP+', speed: 10000 },
+                    { num: 9, type: 'SFP+', speed: 10000 },
+                    { num: 10, type: 'SFP+', speed: 10000 },
+                    { num: 11, type: 'MGMT RJ45', speed: 1000 }
+                ]
+            },
+            camera: { label: 'Camera', ports: 1, color: '#00BCD4', shape: 'ellipse', bandwidth: 100, vlan: 10, priority: 6 },
+            lidar: { label: 'LiDAR', ports: 1, color: '#00C853', shape: 'diamond', bandwidth: 1000, vlan: 20, priority: 7 },
+            radar: { label: 'Radar', ports: 1, color: '#FF9800', shape: 'triangle', bandwidth: 100, vlan: 15, priority: 5 },
+            ecu: { label: 'ECU', ports: 1, color: '#8B5CF6', shape: 'roundrectangle', bandwidth: 100, vlan: 5, priority: 4 }
+        };
+
+        const cy = cytoscape({
+            container: document.getElementById('cy'),
+            style: [
+                {
+                    selector: 'node',
+                    style: {
+                        'shape': 'data(shape)',
+                        'background-color': 'data(color)',
+                        'label': 'data(label)',
+                        'width': 110,
+                        'height': 110,
+                        'text-valign': 'bottom',
+                        'text-halign': 'center',
+                        'text-margin-y': 12,
+                        'font-size': 16,
+                        'font-weight': '700',
+                        'color': '#ffffff',
+                        'text-outline-width': 5,
+                        'text-outline-color': 'data(color)',
+                        'border-width': 5,
+                        'border-color': '#ffffff',
+                        'border-opacity': 0.9
+                    }
+                },
+                {
+                    selector: 'node:selected',
+                    style: {
+                        'border-width': 7,
+                        'border-color': '#FFD700',
+                        'width': 120,
+                        'height': 120
+                    }
+                },
+                {
+                    selector: 'edge',
+                    style: {
+                        'width': 6,
+                        'line-color': '#ffffff',
+                        'opacity': 0.7,
+                        'curve-style': 'bezier',
+                        'target-arrow-shape': 'triangle',
+                        'target-arrow-color': '#ffffff',
+                        'arrow-scale': 2,
+                        'label': 'data(linkInfo)',
+                        'font-size': 13,
+                        'font-weight': '600',
+                        'color': '#ffffff',
+                        'text-outline-width': 3,
+                        'text-outline-color': '#0066FF'
+                    }
+                },
+                {
+                    selector: 'edge:selected',
+                    style: {
+                        'line-color': '#FFD700',
+                        'target-arrow-color': '#FFD700',
+                        'width': 8
+                    }
+                }
+            ],
+            layout: { name: 'preset' }
+        });
+
+        let deviceCounter = 1;
+        let connectionMode = false;
+        let selectedSource = null;
+        let deviceData = new Map();
+
+        function updateStats() {
+            document.getElementById('deviceCount').textContent = cy.nodes().length;
+            document.getElementById('linkCount').textContent = cy.edges().length;
+            let total = 0;
+            cy.edges().forEach(e => total += (parseInt(e.data('bandwidth')) || 0));
+            document.getElementById('bandwidth').textContent = (total / 1000).toFixed(1);
+        }
+
+        function showToast(msg) {
+            const toast = document.getElementById('toast');
+            toast.textContent = msg;
+            toast.classList.add('visible');
+            setTimeout(() => toast.classList.remove('visible'), 2500);
+        }
+
+        document.querySelectorAll('.device-card[data-type]').forEach(card => {
+            card.addEventListener('click', () => addDevice(card.dataset.type));
+        });
+
+        function addDevice(type) {
+            const template = templates[type];
+            const id = `device-${deviceCounter++}`;
+            const label = `${template.label}-${deviceCounter - 1}`;
+
+            const ports = [];
+            if (type === 'lan9662' || type === 'lan9692') {
+                template.portConfigs.forEach(pc => {
+                    ports.push({
+                        num: pc.num,
+                        type: pc.type,
+                        speed: pc.speed,
+                        vlan: 1,
+                        priority: 0,
+                        connected: false
+                    });
+                });
+            } else {
+                for (let i = 0; i < template.ports; i++) {
+                    ports.push({
+                        num: i,
+                        type: 'GbE',
+                        speed: template.bandwidth,
+                        vlan: template.vlan || 1,
+                        priority: template.priority || 0,
+                        connected: false
+                    });
+                }
+            }
+
+            deviceData.set(id, { type, label, ports });
+
+            cy.add({
+                group: 'nodes',
+                data: { id, label, type, color: template.color, shape: template.shape },
+                position: { x: Math.random() * 700 + 250, y: Math.random() * 400 + 150 }
+            });
+
+            updateStats();
+            showToast(`${template.label} added`);
+        }
+
+        cy.on('tap', 'node', function(evt) {
+            const node = evt.target;
+            if (connectionMode) {
+                if (!selectedSource) {
+                    selectedSource = node;
+                    node.style('border-color', '#FFD700');
+                    showToast('Select target');
+                } else if (selectedSource.id() !== node.id()) {
+                    const srcData = deviceData.get(selectedSource.id());
+                    const tgtData = deviceData.get(node.id());
+                    const bw = Math.min(srcData.ports[0].speed, tgtData.ports[0].speed);
+
+                    cy.add({
+                        group: 'edges',
+                        data: {
+                            id: `edge-${selectedSource.id()}-${node.id()}`,
+                            source: selectedSource.id(),
+                            target: node.id(),
+                            bandwidth: bw,
+                            linkInfo: bw >= 1000 ? '1G' : `${bw}M`
+                        }
+                    });
+
+                    selectedSource.style('border-color', '#ffffff');
+                    selectedSource = null;
+                    updateStats();
+                    showToast('Connected');
+                }
+            } else {
+                showProperties(node);
+            }
+        });
+
+        function showProperties(node) {
+            const data = deviceData.get(node.id());
+            const template = templates[data.type];
+
+            let html = `
+                <div class="prop-section">
+                    <div class="prop-title">Device Info</div>
+                    <div class="form-group">
+                        <label class="form-label">Name</label>
+                        <input type="text" class="form-input" value="${data.label}">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Type</label>
+                        <input type="text" class="form-input" value="${template.label}" readonly>
+                    </div>
+                    <div>
+                        <span class="badge badge-success">Active</span>
+                        <span class="badge badge-info">${data.ports.length} Ports</span>
+                    </div>
+                </div>
+
+                <div class="prop-section">
+                    <div class="prop-title">Port Configuration</div>
+            `;
+
+            data.ports.forEach(port => {
+                html += `
+                    <div class="port-detail-card">
+                        <div class="port-detail-header">
+                            <div class="port-detail-name">Port ${port.num}</div>
+                            <div class="port-detail-status ${port.connected ? 'connected' : ''}"></div>
+                        </div>
+                        <div class="port-detail-info">
+                            Type: ${port.type}<br>
+                            Speed: ${port.speed} Mbps<br>
+                            VLAN: ${port.vlan} · Priority: ${port.priority}
+                        </div>
+                    </div>
+                `;
+            });
+
+            html += '</div>';
+            document.getElementById('propertiesContent').innerHTML = html;
+            document.getElementById('properties').classList.add('visible');
+        }
+
+        document.getElementById('connectBtn').addEventListener('click', function() {
+            connectionMode = !connectionMode;
+            this.style.borderColor = connectionMode ? '#0066FF' : '#E0E0E0';
+            showToast(connectionMode ? 'Connect mode ON' : 'Connect mode OFF');
+        });
+
+        document.getElementById('layoutBtn').addEventListener('click', () => {
+            cy.layout({ name: 'circle', animate: true, animationDuration: 600 }).run();
+        });
+
+        document.getElementById('closeBtn').addEventListener('click', () => {
+            document.getElementById('properties').classList.remove('visible');
+        });
+
+        document.getElementById('zoomInBtn').addEventListener('click', () => cy.zoom(cy.zoom() * 1.2));
+        document.getElementById('zoomOutBtn').addEventListener('click', () => cy.zoom(cy.zoom() * 0.8));
+        document.getElementById('fitBtn').addEventListener('click', () => cy.fit(null, 50));
+        document.getElementById('deleteBtn').addEventListener('click', () => {
+            cy.$(':selected').remove();
+            updateStats();
+        });
+
+        document.getElementById('exportBtn').addEventListener('click', () => {
+            const config = {
+                timestamp: new Date().toISOString(),
+                network: {
+                    nodes: cy.nodes().map(n => ({
+                        id: n.id(),
+                        data: n.data(),
+                        position: n.position(),
+                        device: deviceData.get(n.id())
+                    })),
+                    edges: cy.edges().map(e => e.data())
+                }
+            };
+
+            const blob = new Blob([JSON.stringify(config, null, 2)], { type: 'application/json' });
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = `lan9662-network-${Date.now()}.json`;
+            a.click();
+            showToast('Configuration exported');
+        });
+
+        // 초기 샘플
+        setTimeout(() => {
+            addDevice('lan9662');
+            addDevice('camera');
+            addDevice('lidar');
+            addDevice('radar');
+            addDevice('ecu');
+            setTimeout(() => cy.layout({ name: 'circle', animate: true }).run(), 200);
+        }, 100);
+    </script>
+</body>
+</html>

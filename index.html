@@ -1,0 +1,1193 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LAN9662/9692 TSN Network Designer 3D</title>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: linear-gradient(135deg, #0066FF 0%, #00BCD4 100%);
+            overflow: hidden;
+        }
+
+        .app {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+
+        /* 헤더 */
+        .header {
+            height: 72px;
+            background: rgba(255, 255, 255, 0.98);
+            backdrop-filter: blur(20px);
+            border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 32px;
+            box-shadow: 0 2px 12px rgba(0, 102, 255, 0.08);
+            z-index: 100;
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 24px;
+        }
+
+        .title-group h1 {
+            font-size: 20px;
+            font-weight: 700;
+            color: #0066FF;
+            margin-bottom: 4px;
+        }
+
+        .title-group p {
+            font-size: 12px;
+            color: #666;
+        }
+
+        .stats {
+            display: flex;
+            gap: 32px;
+        }
+
+        .stat {
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 24px;
+            font-weight: 700;
+            color: #0066FF;
+        }
+
+        .stat-label {
+            font-size: 11px;
+            color: #666;
+            text-transform: uppercase;
+            margin-top: 4px;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            border-radius: 8px;
+            border: none;
+            font-weight: 600;
+            cursor: pointer;
+            font-size: 13px;
+            background: #0066FF;
+            color: white;
+            transition: all 0.2s;
+        }
+
+        .btn:hover {
+            background: #0052CC;
+            transform: translateY(-1px);
+        }
+
+        /* 메인 */
+        .main {
+            flex: 1;
+            display: flex;
+            overflow: hidden;
+        }
+
+        /* 사이드바 */
+        .sidebar {
+            width: 360px;
+            background: rgba(255, 255, 255, 0.98);
+            backdrop-filter: blur(20px);
+            border-right: 1px solid rgba(0, 0, 0, 0.1);
+            overflow-y: auto;
+        }
+
+        .sidebar-section {
+            padding: 24px;
+            border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+        }
+
+        .section-title {
+            font-size: 11px;
+            font-weight: 700;
+            color: #0066FF;
+            text-transform: uppercase;
+            letter-spacing: 1.2px;
+            margin-bottom: 20px;
+        }
+
+        .device-card {
+            background: white;
+            border: 2px solid #E0E0E0;
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .device-card:hover {
+            border-color: #0066FF;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 16px rgba(0, 102, 255, 0.12);
+        }
+
+        .device-header {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            margin-bottom: 12px;
+        }
+
+        .device-icon {
+            width: 56px;
+            height: 56px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, rgba(0, 102, 255, 0.1) 0%, rgba(0, 188, 212, 0.1) 100%);
+            border-radius: 12px;
+            font-size: 32px;
+        }
+
+        .device-info h3 {
+            font-size: 15px;
+            font-weight: 700;
+            color: #1A1A1A;
+            margin-bottom: 4px;
+        }
+
+        .device-info p {
+            font-size: 12px;
+            color: #666;
+        }
+
+        .device-specs {
+            background: #F8FAFB;
+            padding: 12px;
+            border-radius: 8px;
+            font-size: 11px;
+            line-height: 1.6;
+            color: #666;
+        }
+
+        /* 캔버스 */
+        .canvas {
+            flex: 1;
+            position: relative;
+        }
+
+        #canvas3d {
+            width: 100%;
+            height: 100%;
+        }
+
+        /* 플로팅 컨트롤 */
+        .floating-controls {
+            position: absolute;
+            bottom: 32px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 12px;
+            background: rgba(255, 255, 255, 0.98);
+            padding: 12px;
+            border-radius: 12px;
+            box-shadow: 0 4px 24px rgba(0, 0, 0, 0.12);
+        }
+
+        .control-btn {
+            width: 48px;
+            height: 48px;
+            border-radius: 10px;
+            background: white;
+            border: 2px solid #E0E0E0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 20px;
+        }
+
+        .control-btn:hover {
+            background: #0066FF;
+            border-color: #0066FF;
+            color: white;
+        }
+
+        .control-btn.active {
+            background: #0066FF;
+            border-color: #0066FF;
+            color: white;
+        }
+
+        /* 프로퍼티 패널 */
+        .properties {
+            width: 420px;
+            background: rgba(255, 255, 255, 0.98);
+            backdrop-filter: blur(20px);
+            border-left: 1px solid rgba(0, 0, 0, 0.1);
+            transform: translateX(100%);
+            transition: transform 0.3s;
+            position: absolute;
+            right: 0;
+            top: 0;
+            height: 100%;
+            z-index: 50;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .properties.visible {
+            transform: translateX(0);
+        }
+
+        .properties-header {
+            height: 72px;
+            padding: 0 24px;
+            border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .properties-title {
+            font-size: 16px;
+            font-weight: 700;
+        }
+
+        .close-btn {
+            width: 36px;
+            height: 36px;
+            border-radius: 8px;
+            background: transparent;
+            border: none;
+            cursor: pointer;
+            font-size: 18px;
+            color: #666;
+        }
+
+        .properties-content {
+            padding: 24px;
+            overflow-y: auto;
+            flex: 1;
+        }
+
+        .prop-section {
+            margin-bottom: 28px;
+        }
+
+        .prop-title {
+            font-size: 11px;
+            font-weight: 700;
+            color: #0066FF;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 16px;
+        }
+
+        .form-group {
+            margin-bottom: 16px;
+        }
+
+        .form-label {
+            display: block;
+            font-size: 12px;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        .form-input {
+            width: 100%;
+            padding: 10px 14px;
+            border: 2px solid #E0E0E0;
+            border-radius: 8px;
+            font-size: 13px;
+        }
+
+        .port-detail-card {
+            padding: 14px;
+            background: #F8FAFB;
+            border: 1px solid #E0E0E0;
+            border-radius: 8px;
+            margin-bottom: 10px;
+        }
+
+        .port-detail-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+
+        .port-detail-name {
+            font-size: 13px;
+            font-weight: 600;
+        }
+
+        .port-detail-info {
+            font-size: 11px;
+            color: #666;
+            line-height: 1.6;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 600;
+            margin-right: 6px;
+        }
+
+        .badge-success { background: #E8F5E9; color: #00C853; }
+        .badge-info { background: #E1F5FE; color: #0066FF; }
+
+        .toast {
+            position: fixed;
+            bottom: 110px;
+            left: 50%;
+            transform: translateX(-50%) translateY(100px);
+            padding: 14px 28px;
+            background: rgba(26, 26, 26, 0.95);
+            color: white;
+            border-radius: 8px;
+            font-weight: 500;
+            font-size: 13px;
+            opacity: 0;
+            transition: all 0.3s;
+            z-index: 1000;
+        }
+
+        .toast.visible {
+            opacity: 1;
+            transform: translateX(-50%) translateY(0);
+        }
+
+        .help-text {
+            position: absolute;
+            top: 24px;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 12px 24px;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 8px;
+            font-size: 12px;
+            color: #666;
+            box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
+        }
+
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #F5F7FA; }
+        ::-webkit-scrollbar-thumb { background: #0066FF; border-radius: 4px; }
+    </style>
+</head>
+<body>
+    <div class="app">
+        <div class="header">
+            <div class="header-left">
+                <div class="title-group">
+                    <h1>LAN9662/9692 TSN Network Designer 3D</h1>
+                    <p>Time-Sensitive Networking · 3D Visualization</p>
+                </div>
+            </div>
+            <div class="stats">
+                <div class="stat">
+                    <div class="stat-value" id="deviceCount">0</div>
+                    <div class="stat-label">Devices</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-value" id="linkCount">0</div>
+                    <div class="stat-label">Links</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-value" id="bandwidth">0</div>
+                    <div class="stat-label">Gbps</div>
+                </div>
+            </div>
+            <div>
+                <button class="btn" id="layoutBtn">⚡ Auto Layout</button>
+                <button class="btn" id="exportBtn">📤 Export</button>
+            </div>
+        </div>
+
+        <div class="main">
+            <div class="sidebar">
+                <div class="sidebar-section">
+                    <div class="section-title">TSN Switches</div>
+
+                    <div class="device-card" data-type="lan9662">
+                        <div class="device-header">
+                            <div class="device-icon">🔷</div>
+                            <div class="device-info">
+                                <h3>LAN9662</h3>
+                                <p>12-Port TSN Switch</p>
+                            </div>
+                        </div>
+                        <div class="device-specs">
+                            <strong>Physical Ports:</strong><br>
+                            • 7× MateNET (Industrial Ethernet)<br>
+                            • 4× SFP (Fiber, 1G)<br>
+                            • 1× RJ45 (Management)<br>
+                            <br>
+                            <strong>Total: 12 Ports</strong><br>
+                            IEEE 802.1Qbv/Qav/Qbu · PTP
+                        </div>
+                    </div>
+
+                    <div class="device-card" data-type="lan9692">
+                        <div class="device-header">
+                            <div class="device-icon">🟢</div>
+                            <div class="device-info">
+                                <h3>LAN9692</h3>
+                                <p>10-Port TSN Switch</p>
+                            </div>
+                        </div>
+                        <div class="device-specs">
+                            <strong>Physical Ports:</strong><br>
+                            • 8× RJ45 (Copper, 1G)<br>
+                            • 2× SFP (Fiber, 1G)<br>
+                            • 2× SFP+ (Fiber, 10G) ⚡<br>
+                            <br>
+                            <strong>Total: 12 Ports</strong><br>
+                            More expansion than LAN9662
+                        </div>
+                    </div>
+                </div>
+
+                <div class="sidebar-section">
+                    <div class="section-title">TSN Endpoints</div>
+
+                    <div class="device-card" data-type="camera">
+                        <div class="device-header">
+                            <div class="device-icon">📷</div>
+                            <div class="device-info">
+                                <h3>Camera</h3>
+                                <p>Video Sensor</p>
+                            </div>
+                        </div>
+                        <div class="device-specs">100 Mbps · Priority 6</div>
+                    </div>
+
+                    <div class="device-card" data-type="lidar">
+                        <div class="device-header">
+                            <div class="device-icon">📡</div>
+                            <div class="device-info">
+                                <h3>LiDAR</h3>
+                                <p>Range Sensor</p>
+                            </div>
+                        </div>
+                        <div class="device-specs">1000 Mbps · Priority 7</div>
+                    </div>
+
+                    <div class="device-card" data-type="radar">
+                        <div class="device-header">
+                            <div class="device-icon">📶</div>
+                            <div class="device-info">
+                                <h3>Radar</h3>
+                                <p>Object Detection</p>
+                            </div>
+                        </div>
+                        <div class="device-specs">100 Mbps · Priority 5</div>
+                    </div>
+
+                    <div class="device-card" data-type="ecu">
+                        <div class="device-header">
+                            <div class="device-icon">🖥️</div>
+                            <div class="device-info">
+                                <h3>ECU</h3>
+                                <p>Control Unit</p>
+                            </div>
+                        </div>
+                        <div class="device-specs">100 Mbps · Priority 4</div>
+                    </div>
+                </div>
+
+                <div class="sidebar-section">
+                    <div class="section-title">Tools</div>
+                    <div class="device-card" id="connectBtn">
+                        <div class="device-header">
+                            <div class="device-icon">🔗</div>
+                            <div class="device-info">
+                                <h3>Connect Mode</h3>
+                                <p>Link devices</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="canvas">
+                <div id="canvas3d"></div>
+
+                <div class="help-text">
+                    <strong>우클릭 드래그:</strong> 회전 · <strong>마우스 휠:</strong> 줌 · <strong>좌클릭:</strong> 장치 선택/드래그
+                </div>
+
+                <div class="floating-controls">
+                    <div class="control-btn" id="rotateBtn" title="자동 회전">🔄</div>
+                    <div class="control-btn" id="resetBtn" title="리셋">🎯</div>
+                    <div class="control-btn" id="deleteBtn" title="삭제">🗑️</div>
+                </div>
+            </div>
+
+            <div class="properties" id="properties">
+                <div class="properties-header">
+                    <div class="properties-title">Device Properties</div>
+                    <button class="close-btn" id="closeBtn">✕</button>
+                </div>
+                <div class="properties-content" id="propertiesContent">
+                    <p style="color: #666; text-align: center; padding: 60px 24px;">
+                        Select a device to view properties
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="toast" id="toast"></div>
+
+    <script>
+        // Three.js 초기화
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0xF5F7FA);
+        scene.fog = new THREE.Fog(0xF5F7FA, 50, 200);
+
+        const camera = new THREE.PerspectiveCamera(60, 1, 0.1, 1000);
+        camera.position.set(0, 30, 50);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+        const container = document.getElementById('canvas3d');
+        function updateSize() {
+            const width = container.clientWidth;
+            const height = container.clientHeight;
+            camera.aspect = width / height;
+            camera.updateProjectionMatrix();
+            renderer.setSize(width, height);
+        }
+        updateSize();
+        container.appendChild(renderer.domElement);
+        window.addEventListener('resize', updateSize);
+
+        // OrbitControls
+        const controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+        controls.minDistance = 20;
+        controls.maxDistance = 100;
+
+        // 조명
+        const ambientLight = new THREE.AmbientLight(0xFFFFFF, 0.6);
+        scene.add(ambientLight);
+
+        const mainLight = new THREE.DirectionalLight(0xFFFFFF, 0.8);
+        mainLight.position.set(30, 50, 30);
+        mainLight.castShadow = true;
+        mainLight.shadow.mapSize.width = 2048;
+        mainLight.shadow.mapSize.height = 2048;
+        mainLight.shadow.camera.near = 0.5;
+        mainLight.shadow.camera.far = 200;
+        mainLight.shadow.camera.left = -50;
+        mainLight.shadow.camera.right = 50;
+        mainLight.shadow.camera.top = 50;
+        mainLight.shadow.camera.bottom = -50;
+        scene.add(mainLight);
+
+        const fillLight = new THREE.DirectionalLight(0x0066FF, 0.3);
+        fillLight.position.set(-20, 20, -20);
+        scene.add(fillLight);
+
+        // 그리드
+        const gridHelper = new THREE.GridHelper(100, 50, 0x0066FF, 0xCCCCCC);
+        gridHelper.material.opacity = 0.3;
+        gridHelper.material.transparent = true;
+        gridHelper.position.y = -0.5;
+        scene.add(gridHelper);
+
+        // 바닥
+        const planeGeo = new THREE.PlaneGeometry(100, 100);
+        const planeMat = new THREE.ShadowMaterial({ opacity: 0.2 });
+        const plane = new THREE.Mesh(planeGeo, planeMat);
+        plane.rotation.x = -Math.PI / 2;
+        plane.position.y = -0.5;
+        plane.receiveShadow = true;
+        scene.add(plane);
+
+        // 장치 템플릿
+        const templates = {
+            lan9662: {
+                label: 'LAN9662',
+                color: 0x0066FF,
+                ports: 12,
+                mateNetPorts: 7,
+                sfpPorts: 4,
+                mgmtRj45: 1,
+                size: { w: 9, h: 3, d: 5 }
+            },
+            lan9692: {
+                label: 'LAN9692',
+                color: 0x00C853,
+                ports: 12,
+                mateNetPorts: 7,     // 100BASE-T1 / 1000BASE-T1 MateNET connectors
+                sfpPlusPorts: 4,     // SFP+ 1G/10G fiber optic
+                mgmtRj45: 1,         // Management RJ45 port
+                size: { w: 10, h: 3.5, d: 5 }
+            },
+            camera: {
+                label: 'Camera',
+                color: 0x00BCD4,
+                ports: 1,
+                size: { w: 3, h: 3, d: 3 }
+            },
+            lidar: {
+                label: 'LiDAR',
+                color: 0x00C853,
+                ports: 1,
+                size: { w: 3, h: 4, d: 3 }
+            },
+            radar: {
+                label: 'Radar',
+                color: 0xFF9800,
+                ports: 1,
+                size: { w: 3, h: 2, d: 3 }
+            },
+            ecu: {
+                label: 'ECU',
+                color: 0x8B5CF6,
+                ports: 1,
+                size: { w: 4, h: 2, d: 3 }
+            }
+        };
+
+        const state = {
+            devices: new Map(),
+            connections: [],
+            selected: null,
+            connectionMode: false,
+            connectingFrom: null,
+            deviceCounter: 1,
+            draggedDevice: null,
+            autoRotate: false
+        };
+
+        const raycaster = new THREE.Raycaster();
+        const mouse = new THREE.Vector2();
+        const dragPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+
+        // 장치 생성
+        function createDeviceMesh(device, template) {
+            const group = new THREE.Group();
+            group.userData.device = device;
+            group.userData.isDevice = true;
+
+            const { w, h, d } = template.size;
+
+            // 메인 박스
+            const geometry = new THREE.BoxGeometry(w, h, d);
+            const material = new THREE.MeshPhongMaterial({
+                color: template.color,
+                shininess: 60,
+                specular: 0x444444
+            });
+            const mesh = new THREE.Mesh(geometry, material);
+            mesh.castShadow = true;
+            mesh.receiveShadow = true;
+            group.add(mesh);
+
+            // 테두리
+            const edges = new THREE.EdgesGeometry(geometry);
+            const lineMat = new THREE.LineBasicMaterial({ color: 0xFFFFFF, linewidth: 2 });
+            const wireframe = new THREE.LineSegments(edges, lineMat);
+            group.add(wireframe);
+
+            // 포트 표시
+            let portIndex = 0;
+
+            // RJ45 포트 (일반)
+            if (template.rj45Ports) {
+                const rj45Geo = new THREE.BoxGeometry(0.8, 0.6, 0.4);
+                const rj45Mat = new THREE.MeshPhongMaterial({
+                    color: 0x333333,
+                    metalness: 0.5
+                });
+
+                for (let i = 0; i < template.rj45Ports; i++) {
+                    const portMesh = new THREE.Mesh(rj45Geo, rj45Mat.clone());
+                    portMesh.position.set(-w/2 + 1.5 + i * 1.2, 0, d/2 + 0.2);
+                    portMesh.userData = { port: portIndex++, device, isPort: true, type: 'RJ45' };
+                    group.add(portMesh);
+
+                    // RJ45 LED
+                    const ledGeo = new THREE.BoxGeometry(0.15, 0.15, 0.05);
+                    const ledMat = new THREE.MeshPhongMaterial({
+                        color: 0x00FF00,
+                        emissive: 0x00FF00,
+                        emissiveIntensity: 0.8
+                    });
+                    const led = new THREE.Mesh(ledGeo, ledMat);
+                    led.position.set(0.25, 0.2, 0.25);
+                    portMesh.add(led);
+                }
+            }
+
+            // MateNET 포트 (LAN9662 전용 - 작은 이더넷 커넥터)
+            if (template.mateNetPorts) {
+                const mateNetGeo = new THREE.BoxGeometry(0.5, 0.5, 0.3);
+                const mateNetMat = new THREE.MeshPhongMaterial({
+                    color: 0x1E88E5,
+                    metalness: 0.6
+                });
+
+                const spacing = w / (template.mateNetPorts + 1);
+                for (let i = 0; i < template.mateNetPorts; i++) {
+                    const portMesh = new THREE.Mesh(mateNetGeo, mateNetMat.clone());
+                    portMesh.position.set(-w/2 + spacing * (i + 1), 0, d/2 + 0.15);
+                    portMesh.userData = { port: portIndex++, device, isPort: true, type: 'MateNET' };
+                    group.add(portMesh);
+
+                    // MateNET 라벨
+                    const labelGeo = new THREE.PlaneGeometry(0.4, 0.15);
+                    const labelCanvas = document.createElement('canvas');
+                    labelCanvas.width = 64;
+                    labelCanvas.height = 32;
+                    const labelCtx = labelCanvas.getContext('2d');
+                    labelCtx.fillStyle = '#FFFFFF';
+                    labelCtx.font = 'bold 16px Arial';
+                    labelCtx.textAlign = 'center';
+                    labelCtx.fillText(`M${i}`, 32, 20);
+                    const labelTexture = new THREE.CanvasTexture(labelCanvas);
+                    const labelMat = new THREE.MeshBasicMaterial({ map: labelTexture });
+                    const label = new THREE.Mesh(labelGeo, labelMat);
+                    label.position.set(0, 0.35, 0);
+                    portMesh.add(label);
+                }
+            }
+
+            // 관리용 RJ45 (Management)
+            if (template.mgmtRj45) {
+                const mgmtGeo = new THREE.BoxGeometry(0.8, 0.6, 0.4);
+                const mgmtMat = new THREE.MeshPhongMaterial({
+                    color: 0xFF9800,
+                    metalness: 0.5
+                });
+
+                const portMesh = new THREE.Mesh(mgmtGeo, mgmtMat);
+                portMesh.position.set(w/2 - 1, h/2 - 0.5, d/2 + 0.2);
+                portMesh.userData = { port: portIndex++, device, isPort: true, type: 'MGMT' };
+                group.add(portMesh);
+
+                // MGMT 라벨
+                const labelGeo = new THREE.PlaneGeometry(0.7, 0.25);
+                const labelCanvas = document.createElement('canvas');
+                labelCanvas.width = 128;
+                labelCanvas.height = 64;
+                const labelCtx = labelCanvas.getContext('2d');
+                labelCtx.fillStyle = '#000000';
+                labelCtx.font = 'bold 24px Arial';
+                labelCtx.textAlign = 'center';
+                labelCtx.fillText('MGMT', 64, 40);
+                const labelTexture = new THREE.CanvasTexture(labelCanvas);
+                const labelMat = new THREE.MeshBasicMaterial({ map: labelTexture });
+                const label = new THREE.Mesh(labelGeo, labelMat);
+                label.position.set(0, 0.45, 0);
+                portMesh.add(label);
+            }
+
+            // SFP 포트 (1G)
+            if (template.sfpPorts) {
+                const sfpGeo = new THREE.BoxGeometry(0.6, 0.5, 0.8);
+                const sfpMat = new THREE.MeshPhongMaterial({
+                    color: 0x888888,
+                    metalness: 0.7
+                });
+
+                const sfpSpacing = Math.min(0.8, w / (template.sfpPorts + 1));
+                const sfpStartX = w/2 - 1;
+
+                for (let i = 0; i < template.sfpPorts; i++) {
+                    const portMesh = new THREE.Mesh(sfpGeo, sfpMat.clone());
+
+                    // SFP 포트를 뒷면에 배치
+                    if (i < 2) {
+                        portMesh.position.set(sfpStartX - i * sfpSpacing, 0, -d/2 - 0.4);
+                    } else {
+                        portMesh.position.set(-sfpStartX + (i-2) * sfpSpacing, 0, -d/2 - 0.4);
+                    }
+
+                    portMesh.userData = { port: portIndex++, device, isPort: true, type: 'SFP' };
+                    group.add(portMesh);
+
+                    // SFP 라벨
+                    const labelGeo = new THREE.PlaneGeometry(0.5, 0.2);
+                    const labelCanvas = document.createElement('canvas');
+                    labelCanvas.width = 128;
+                    labelCanvas.height = 64;
+                    const labelCtx = labelCanvas.getContext('2d');
+                    labelCtx.fillStyle = '#FFFFFF';
+                    labelCtx.font = 'bold 28px Arial';
+                    labelCtx.textAlign = 'center';
+                    labelCtx.fillText(`SFP${i}`, 64, 40);
+                    const labelTexture = new THREE.CanvasTexture(labelCanvas);
+                    const labelMat = new THREE.MeshBasicMaterial({ map: labelTexture });
+                    const label = new THREE.Mesh(labelGeo, labelMat);
+                    label.position.set(0, 0.35, 0);
+                    portMesh.add(label);
+                }
+            }
+
+            // SFP+ 포트 (1G/10G) - LAN9692용
+            if (template.sfp10gPorts || template.sfpPlusPorts) {
+                const portCount = template.sfp10gPorts || template.sfpPlusPorts;
+                const sfp10gGeo = new THREE.BoxGeometry(0.7, 0.6, 1.0);
+                const sfp10gMat = new THREE.MeshPhongMaterial({
+                    color: 0xFFD700,
+                    metalness: 0.8,
+                    emissive: 0xFFD700,
+                    emissiveIntensity: 0.3
+                });
+
+                for (let i = 0; i < portCount; i++) {
+                    const portMesh = new THREE.Mesh(sfp10gGeo, sfp10gMat.clone());
+                    portMesh.position.set(-w/2 + 1 + i * 0.9, h/2 - 0.5, -d/2 - 0.5);
+                    portMesh.userData = { port: portIndex++, device, isPort: true, type: 'SFP+ 10G' };
+                    group.add(portMesh);
+
+                    // 10G 라벨
+                    const labelGeo = new THREE.PlaneGeometry(0.6, 0.3);
+                    const labelCanvas = document.createElement('canvas');
+                    labelCanvas.width = 128;
+                    labelCanvas.height = 64;
+                    const labelCtx = labelCanvas.getContext('2d');
+                    labelCtx.fillStyle = '#000000';
+                    labelCtx.font = 'bold 28px Arial';
+                    labelCtx.textAlign = 'center';
+                    labelCtx.fillText('10G', 64, 40);
+                    const labelTexture = new THREE.CanvasTexture(labelCanvas);
+                    const labelMat = new THREE.MeshBasicMaterial({ map: labelTexture });
+                    const label = new THREE.Mesh(labelGeo, labelMat);
+                    label.position.set(0, 0.4, 0);
+                    portMesh.add(label);
+                }
+            }
+
+            // 일반 포트 (기타 장치들)
+            if (template.ports && !template.rj45Ports && !template.sfpPorts) {
+                const portRadius = 0.25;
+                const portGeometry = new THREE.SphereGeometry(portRadius, 12, 12);
+                const portMaterial = new THREE.MeshPhongMaterial({
+                    color: 0xFFFFFF,
+                    emissive: 0x0066FF,
+                    emissiveIntensity: 0.5
+                });
+
+                const portsPerSide = Math.ceil(template.ports / 2);
+                for (let i = 0; i < template.ports; i++) {
+                    const portMesh = new THREE.Mesh(portGeometry, portMaterial.clone());
+                    const side = i < portsPerSide ? 1 : -1;
+                    const idx = i % portsPerSide;
+                    const spacing = w / (portsPerSide + 1);
+                    portMesh.position.set(
+                        -w/2 + spacing * (idx + 1),
+                        0,
+                        side * d/2
+                    );
+                    portMesh.userData = { port: portIndex++, device, isPort: true, type: 'Ethernet' };
+                    group.add(portMesh);
+                }
+            }
+
+            // 라벨
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            canvas.width = 512;
+            canvas.height = 128;
+            ctx.fillStyle = '#FFFFFF';
+            ctx.fillRect(0, 0, 512, 128);
+            ctx.fillStyle = '#1A1A1A';
+            ctx.font = 'bold 56px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText(device.label, 256, 80);
+
+            const texture = new THREE.CanvasTexture(canvas);
+            const spriteMat = new THREE.SpriteMaterial({ map: texture });
+            const sprite = new THREE.Sprite(spriteMat);
+            sprite.scale.set(8, 2, 1);
+            sprite.position.y = h + 1;
+            group.add(sprite);
+
+            group.position.copy(device.position);
+            device.mesh = group;
+            scene.add(group);
+        }
+
+        // 장치 추가
+        function addDevice(type) {
+            const template = templates[type];
+            const id = `device-${state.deviceCounter++}`;
+            const label = `${template.label}-${state.deviceCounter - 1}`;
+
+            const device = {
+                id,
+                type,
+                label,
+                position: new THREE.Vector3(
+                    (Math.random() - 0.5) * 40,
+                    0,
+                    (Math.random() - 0.5) * 40
+                ),
+                ports: template.ports,
+                mesh: null
+            };
+
+            createDeviceMesh(device, template);
+            state.devices.set(id, device);
+            updateStats();
+            showToast(`${template.label} added`);
+        }
+
+        // 연결 생성
+        function createConnection(from, to) {
+            const points = [from.position, to.position];
+            const geometry = new THREE.BufferGeometry().setFromPoints(points);
+            const material = new THREE.LineBasicMaterial({
+                color: 0x0066FF,
+                linewidth: 3
+            });
+            const line = new THREE.Line(geometry, material);
+
+            const conn = { from, to, line };
+            state.connections.push(conn);
+            scene.add(line);
+            updateStats();
+        }
+
+        // 연결 업데이트
+        function updateConnections() {
+            state.connections.forEach(conn => {
+                const points = [conn.from.position, conn.to.position];
+                conn.line.geometry.setFromPoints(points);
+            });
+        }
+
+        // 마우스 이벤트
+        renderer.domElement.addEventListener('mousedown', onMouseDown);
+        renderer.domElement.addEventListener('mousemove', onMouseMove);
+        renderer.domElement.addEventListener('mouseup', onMouseUp);
+
+        function onMouseDown(e) {
+            if (e.button !== 0) return;
+
+            const rect = renderer.domElement.getBoundingClientRect();
+            mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+            mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+
+            raycaster.setFromCamera(mouse, camera);
+            const intersects = raycaster.intersectObjects(scene.children, true);
+
+            if (intersects.length > 0) {
+                const obj = intersects[0].object;
+                let device = obj.userData.device;
+                if (!device && obj.parent && obj.parent.userData.isDevice) {
+                    device = obj.parent.userData.device;
+                }
+
+                if (device) {
+                    if (state.connectionMode) {
+                        if (!state.connectingFrom) {
+                            state.connectingFrom = device;
+                            showToast('Select target device');
+                        } else if (state.connectingFrom.id !== device.id) {
+                            createConnection(state.connectingFrom, device);
+                            state.connectingFrom = null;
+                            showToast('Connected');
+                        }
+                    } else {
+                        state.selected = device;
+                        state.draggedDevice = device;
+                        controls.enabled = false;
+                        showProperties(device);
+                    }
+                }
+            }
+        }
+
+        function onMouseMove(e) {
+            if (state.draggedDevice) {
+                const rect = renderer.domElement.getBoundingClientRect();
+                mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+                mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+
+                raycaster.setFromCamera(mouse, camera);
+                const intersection = new THREE.Vector3();
+                raycaster.ray.intersectPlane(dragPlane, intersection);
+
+                if (intersection) {
+                    state.draggedDevice.position.copy(intersection);
+                    state.draggedDevice.mesh.position.copy(intersection);
+                    updateConnections();
+                }
+            }
+        }
+
+        function onMouseUp() {
+            state.draggedDevice = null;
+            controls.enabled = true;
+        }
+
+        // 통계 업데이트
+        function updateStats() {
+            document.getElementById('deviceCount').textContent = state.devices.size;
+            document.getElementById('linkCount').textContent = state.connections.length;
+            let total = 0;
+            state.connections.forEach(() => total += 1);
+            document.getElementById('bandwidth').textContent = total;
+        }
+
+        // 토스트
+        function showToast(msg) {
+            const toast = document.getElementById('toast');
+            toast.textContent = msg;
+            toast.classList.add('visible');
+            setTimeout(() => toast.classList.remove('visible'), 2500);
+        }
+
+        // 프로퍼티 표시
+        function showProperties(device) {
+            const template = templates[device.type];
+            document.getElementById('propertiesContent').innerHTML = `
+                <div class="prop-section">
+                    <div class="prop-title">Device Info</div>
+                    <div class="form-group">
+                        <label class="form-label">Name</label>
+                        <input type="text" class="form-input" value="${device.label}">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Type</label>
+                        <input type="text" class="form-input" value="${template.label}" readonly>
+                    </div>
+                    <div>
+                        <span class="badge badge-success">Active</span>
+                        <span class="badge badge-info">${template.ports} Ports</span>
+                    </div>
+                </div>
+            `;
+            document.getElementById('properties').classList.add('visible');
+        }
+
+        // 버튼 이벤트
+        document.querySelectorAll('.device-card[data-type]').forEach(card => {
+            card.addEventListener('click', () => addDevice(card.dataset.type));
+        });
+
+        document.getElementById('connectBtn').addEventListener('click', function() {
+            state.connectionMode = !state.connectionMode;
+            this.style.borderColor = state.connectionMode ? '#0066FF' : '#E0E0E0';
+            showToast(state.connectionMode ? 'Connect mode ON' : 'Connect mode OFF');
+        });
+
+        document.getElementById('rotateBtn').addEventListener('click', function() {
+            state.autoRotate = !state.autoRotate;
+            controls.autoRotate = state.autoRotate;
+            this.classList.toggle('active');
+            showToast(state.autoRotate ? 'Auto rotate ON' : 'Auto rotate OFF');
+        });
+
+        document.getElementById('resetBtn').addEventListener('click', () => {
+            camera.position.set(0, 30, 50);
+            controls.target.set(0, 0, 0);
+            controls.update();
+        });
+
+        document.getElementById('deleteBtn').addEventListener('click', () => {
+            if (state.selected) {
+                state.connections = state.connections.filter(conn => {
+                    if (conn.from.id === state.selected.id || conn.to.id === state.selected.id) {
+                        scene.remove(conn.line);
+                        return false;
+                    }
+                    return true;
+                });
+                scene.remove(state.selected.mesh);
+                state.devices.delete(state.selected.id);
+                state.selected = null;
+                updateStats();
+                showToast('Deleted');
+            }
+        });
+
+        document.getElementById('closeBtn').addEventListener('click', () => {
+            document.getElementById('properties').classList.remove('visible');
+        });
+
+        document.getElementById('layoutBtn').addEventListener('click', () => {
+            const devices = Array.from(state.devices.values());
+            const radius = 20;
+            devices.forEach((device, i) => {
+                const angle = (Math.PI * 2 * i) / devices.length;
+                device.position.set(Math.cos(angle) * radius, 0, Math.sin(angle) * radius);
+                device.mesh.position.copy(device.position);
+            });
+            updateConnections();
+            showToast('Layout applied');
+        });
+
+        document.getElementById('exportBtn').addEventListener('click', () => {
+            const config = {
+                timestamp: new Date().toISOString(),
+                devices: Array.from(state.devices.values()).map(d => ({
+                    id: d.id,
+                    type: d.type,
+                    label: d.label,
+                    position: { x: d.position.x, y: d.position.y, z: d.position.z }
+                })),
+                connections: state.connections.map(c => ({
+                    from: c.from.id,
+                    to: c.to.id
+                }))
+            };
+
+            const blob = new Blob([JSON.stringify(config, null, 2)], { type: 'application/json' });
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = `tsn-network-3d-${Date.now()}.json`;
+            a.click();
+            showToast('Exported');
+        });
+
+        // 애니메이션 루프
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+            renderer.render(scene, camera);
+        }
+
+        // 초기 샘플
+        setTimeout(() => {
+            addDevice('lan9662');
+            addDevice('lan9692');
+            addDevice('camera');
+            addDevice('lidar');
+            addDevice('radar');
+            setTimeout(() => document.getElementById('layoutBtn').click(), 200);
+        }, 100);
+
+        animate();
+    </script>
+</body>
+</html>
