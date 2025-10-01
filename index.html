@@ -534,10 +534,11 @@
                 <div id="canvas3d"></div>
 
                 <div class="help-text">
-                    <strong>우클릭 드래그:</strong> 회전 · <strong>마우스 휠:</strong> 줌 · <strong>좌클릭:</strong> 장치 선택/드래그
+                    <strong>선택 모드:</strong> 클릭 선택 & 드래그 이동 · <strong>연결 모드:</strong> 장치 클릭하여 연결 · <strong>터치:</strong> 길게 눌러서 연결
                 </div>
 
                 <div class="floating-controls">
+                    <div class="control-btn" id="selectBtn" title="선택 모드">👆</div>
                     <div class="control-btn" id="rotateBtn" title="자동 회전">🔄</div>
                     <div class="control-btn" id="resetBtn" title="리셋">🎯</div>
                     <div class="control-btn" id="deleteBtn" title="삭제">🗑️</div>
@@ -679,16 +680,21 @@
             devices: new Map(),
             connections: [],
             selected: null,
-            connectionMode: false,
+            mode: 'select', // 'select' or 'connect'
             connectingFrom: null,
             deviceCounter: 1,
             draggedDevice: null,
-            autoRotate: false
+            autoRotate: false,
+            longPressTimer: null,
+            touchStartTime: 0,
+            isTouchDragging: false
         };
 
         const raycaster = new THREE.Raycaster();
         const mouse = new THREE.Vector2();
         const dragPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+
+        const LONG_PRESS_DURATION = 500; // 500ms for long press
 
         // 장치 생성
         function createDeviceMesh(device, template) {
@@ -985,17 +991,18 @@
             });
         }
 
-        // 마우스 이벤트
+        // 마우스 & 터치 이벤트
         renderer.domElement.addEventListener('mousedown', onMouseDown);
         renderer.domElement.addEventListener('mousemove', onMouseMove);
         renderer.domElement.addEventListener('mouseup', onMouseUp);
+        renderer.domElement.addEventListener('touchstart', onTouchStart, { passive: false });
+        renderer.domElement.addEventListener('touchmove', onTouchMove, { passive: false });
+        renderer.domElement.addEventListener('touchend', onTouchEnd, { passive: false });
 
-        function onMouseDown(e) {
-            if (e.button !== 0) return;
-
+        function getDeviceFromIntersection(clientX, clientY) {
             const rect = renderer.domElement.getBoundingClientRect();
-            mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
-            mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+            mouse.x = ((clientX - rect.left) / rect.width) * 2 - 1;
+            mouse.y = -((clientY - rect.top) / rect.height) * 2 + 1;
 
             raycaster.setFromCamera(mouse, camera);
             const intersects = raycaster.intersectObjects(scene.children, true);
@@ -1006,29 +1013,68 @@
                 if (!device && obj.parent && obj.parent.userData.isDevice) {
                     device = obj.parent.userData.device;
                 }
+                return device;
+            }
+            return null;
+        }
 
-                if (device) {
-                    if (state.connectionMode) {
-                        if (!state.connectingFrom) {
-                            state.connectingFrom = device;
-                            showToast('Select target device');
-                        } else if (state.connectingFrom.id !== device.id) {
-                            createConnection(state.connectingFrom, device);
-                            state.connectingFrom = null;
-                            showToast('Connected');
-                        }
-                    } else {
-                        state.selected = device;
-                        state.draggedDevice = device;
-                        controls.enabled = false;
-                        showProperties(device);
+        function selectDevice(device) {
+            // Clear previous selection
+            if (state.selected && state.selected.mesh) {
+                state.selected.mesh.children.forEach(child => {
+                    if (child.material && child.material.emissive) {
+                        child.material.emissive.setHex(0x000000);
                     }
+                });
+            }
+
+            state.selected = device;
+
+            // Highlight selected device
+            if (device && device.mesh) {
+                device.mesh.children.forEach(child => {
+                    if (child.material && child.material.emissive) {
+                        child.material.emissive.setHex(0x0066FF);
+                        child.material.emissiveIntensity = 0.3;
+                    }
+                });
+                showProperties(device);
+            }
+        }
+
+        function onMouseDown(e) {
+            if (e.button !== 0) return;
+
+            const device = getDeviceFromIntersection(e.clientX, e.clientY);
+
+            if (device) {
+                if (state.mode === 'connect') {
+                    // Connection mode
+                    if (!state.connectingFrom) {
+                        state.connectingFrom = device;
+                        selectDevice(device);
+                        showToast('Click target device to connect');
+                    } else if (state.connectingFrom.id !== device.id) {
+                        createConnection(state.connectingFrom, device);
+                        selectDevice(null);
+                        state.connectingFrom = null;
+                        showToast('Connected! Click another device or exit connect mode');
+                    }
+                } else {
+                    // Select mode - allow dragging
+                    selectDevice(device);
+                    state.draggedDevice = device;
+                    controls.enabled = false;
                 }
+            } else {
+                // Clicked on empty space
+                selectDevice(null);
+                document.getElementById('properties').classList.remove('visible');
             }
         }
 
         function onMouseMove(e) {
-            if (state.draggedDevice) {
+            if (state.draggedDevice && state.mode === 'select') {
                 const rect = renderer.domElement.getBoundingClientRect();
                 mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
                 mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
@@ -1046,7 +1092,97 @@
         }
 
         function onMouseUp() {
+            if (state.mode === 'select') {
+                state.draggedDevice = null;
+                controls.enabled = true;
+            }
+        }
+
+        // Touch events
+        function onTouchStart(e) {
+            if (e.touches.length === 1) {
+                e.preventDefault();
+                const touch = e.touches[0];
+                state.touchStartTime = Date.now();
+                state.isTouchDragging = false;
+
+                const device = getDeviceFromIntersection(touch.clientX, touch.clientY);
+
+                if (device) {
+                    // Start long press timer
+                    state.longPressTimer = setTimeout(() => {
+                        // Long press detected - switch to connect mode for this action
+                        if (!state.isTouchDragging) {
+                            if (state.mode === 'select') {
+                                // Long press in select mode = start connection
+                                state.connectingFrom = device;
+                                selectDevice(device);
+                                showToast('Touch target device to connect');
+                            }
+                        }
+                    }, LONG_PRESS_DURATION);
+
+                    if (state.mode === 'connect') {
+                        // In connect mode, tap to connect
+                        if (!state.connectingFrom) {
+                            state.connectingFrom = device;
+                            selectDevice(device);
+                            showToast('Touch target device to connect');
+                        } else if (state.connectingFrom.id !== device.id) {
+                            createConnection(state.connectingFrom, device);
+                            selectDevice(null);
+                            state.connectingFrom = null;
+                            showToast('Connected!');
+                        }
+                        clearTimeout(state.longPressTimer);
+                    } else {
+                        // Select mode - prepare for drag
+                        selectDevice(device);
+                        state.draggedDevice = device;
+                    }
+                } else {
+                    selectDevice(null);
+                    document.getElementById('properties').classList.remove('visible');
+                }
+            }
+        }
+
+        function onTouchMove(e) {
+            if (e.touches.length === 1 && state.draggedDevice && state.mode === 'select') {
+                e.preventDefault();
+                state.isTouchDragging = true;
+                clearTimeout(state.longPressTimer);
+
+                const touch = e.touches[0];
+                const rect = renderer.domElement.getBoundingClientRect();
+                mouse.x = ((touch.clientX - rect.left) / rect.width) * 2 - 1;
+                mouse.y = -((touch.clientY - rect.top) / rect.height) * 2 + 1;
+
+                raycaster.setFromCamera(mouse, camera);
+                const intersection = new THREE.Vector3();
+                raycaster.ray.intersectPlane(dragPlane, intersection);
+
+                if (intersection) {
+                    state.draggedDevice.position.copy(intersection);
+                    state.draggedDevice.mesh.position.copy(intersection);
+                    updateConnections();
+                    controls.enabled = false;
+                }
+            }
+        }
+
+        function onTouchEnd(e) {
+            clearTimeout(state.longPressTimer);
+
+            const touchDuration = Date.now() - state.touchStartTime;
+
+            // If it was a quick tap (not drag, not long press), treat as selection
+            if (touchDuration < LONG_PRESS_DURATION && !state.isTouchDragging) {
+                // Already handled in touchstart
+            }
+
             state.draggedDevice = null;
+            state.isTouchDragging = false;
             controls.enabled = true;
         }
 
@@ -1095,10 +1231,22 @@
             card.addEventListener('click', () => addDevice(card.dataset.type));
         });
 
+        document.getElementById('selectBtn').addEventListener('click', function() {
+            state.mode = 'select';
+            state.connectingFrom = null;
+            selectDevice(null);
+            this.classList.add('active');
+            document.getElementById('connectBtn').classList.remove('active');
+            showToast('Select Mode: Click to select, drag to move');
+        });
+
         document.getElementById('connectBtn').addEventListener('click', function() {
-            state.connectionMode = !state.connectionMode;
-            this.style.borderColor = state.connectionMode ? '#0066FF' : '#E0E0E0';
-            showToast(state.connectionMode ? 'Connect mode ON' : 'Connect mode OFF');
+            state.mode = 'connect';
+            state.connectingFrom = null;
+            selectDevice(null);
+            this.classList.add('active');
+            document.getElementById('selectBtn').classList.remove('active');
+            showToast('Connect Mode: Click devices to connect (Long-press on touch)');
         });
 
         document.getElementById('rotateBtn').addEventListener('click', function() {
@@ -1176,6 +1324,9 @@
             controls.update();
             renderer.render(scene, camera);
         }
+
+        // Initialize select mode button as active
+        document.getElementById('selectBtn').classList.add('active');
 
         // 초기 샘플
         setTimeout(() => {
