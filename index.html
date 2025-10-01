@@ -690,7 +690,8 @@
             autoRotate: false,
             longPressTimer: null,
             touchStartTime: 0,
-            isTouchDragging: false
+            isTouchDragging: false,
+            wasDragging: false
         };
 
         const raycaster = new THREE.Raycaster();
@@ -994,11 +995,12 @@
             });
         }
 
-        // 마우스 & 터치 이벤트
-        renderer.domElement.addEventListener('mousedown', onMouseDown);
-        renderer.domElement.addEventListener('mousemove', onMouseMove);
-        renderer.domElement.addEventListener('mouseup', onMouseUp);
-        renderer.domElement.addEventListener('touchstart', onTouchStart, { passive: false });
+        // 마우스 & 터치 이벤트 (캡처 단계에서 처리)
+        renderer.domElement.addEventListener('mousedown', onMouseDown, true);
+        renderer.domElement.addEventListener('mousemove', onMouseMove, false);
+        renderer.domElement.addEventListener('mouseup', onMouseUp, false);
+        renderer.domElement.addEventListener('click', onClick, true);
+        renderer.domElement.addEventListener('touchstart', onTouchStart, { passive: false, capture: true });
         renderer.domElement.addEventListener('touchmove', onTouchMove, { passive: false });
         renderer.domElement.addEventListener('touchend', onTouchEnd, { passive: false });
 
@@ -1011,22 +1013,34 @@
             const intersects = raycaster.intersectObjects(scene.children, true);
 
             if (intersects.length > 0) {
-                const obj = intersects[0].object;
-                let device = obj.userData.device;
-                if (!device && obj.parent && obj.parent.userData.isDevice) {
-                    device = obj.parent.userData.device;
+                for (let i = 0; i < intersects.length; i++) {
+                    const obj = intersects[i].object;
+
+                    // Check object itself
+                    if (obj.userData.device) {
+                        return obj.userData.device;
+                    }
+
+                    // Check parent (for grouped objects)
+                    let current = obj.parent;
+                    while (current) {
+                        if (current.userData && current.userData.isDevice) {
+                            return current.userData.device;
+                        }
+                        current = current.parent;
+                    }
                 }
-                return device;
             }
             return null;
         }
 
         function selectDevice(device) {
-            // Clear previous selection
+            // Clear previous selection highlight
             if (state.selected && state.selected.mesh) {
-                state.selected.mesh.children.forEach(child => {
+                state.selected.mesh.traverse(child => {
                     if (child.material && child.material.emissive) {
                         child.material.emissive.setHex(0x000000);
+                        child.material.emissiveIntensity = 0;
                     }
                 });
             }
@@ -1035,22 +1049,32 @@
 
             // Highlight selected device
             if (device && device.mesh) {
-                device.mesh.children.forEach(child => {
+                device.mesh.traverse(child => {
                     if (child.material && child.material.emissive) {
                         child.material.emissive.setHex(0x0066FF);
-                        child.material.emissiveIntensity = 0.3;
+                        child.material.emissiveIntensity = 0.5;
                     }
                 });
                 showProperties(device);
             }
         }
 
-        function onMouseDown(e) {
+        function onClick(e) {
+            // Only handle left click
             if (e.button !== 0) return;
+
+            // Prevent if we were dragging
+            if (state.wasDragging) {
+                state.wasDragging = false;
+                return;
+            }
 
             const device = getDeviceFromIntersection(e.clientX, e.clientY);
 
             if (device) {
+                e.stopPropagation();
+                e.preventDefault();
+
                 if (state.mode === 'connect') {
                     // Connection mode
                     if (!state.connectingFrom) {
@@ -1064,9 +1088,9 @@
                         showToast('Connected! Click another device or exit connect mode');
                     }
                 } else {
-                    // Select mode - allow dragging
+                    // Select mode
                     selectDevice(device);
-                    state.draggedDevice = device;
+                    showToast(`Selected: ${device.label}`);
                 }
             } else {
                 // Clicked on empty space
@@ -1075,8 +1099,25 @@
             }
         }
 
+        function onMouseDown(e) {
+            if (e.button !== 0) return; // Only left click
+
+            const device = getDeviceFromIntersection(e.clientX, e.clientY);
+
+            if (device && state.mode === 'select') {
+                // Start dragging in select mode
+                e.stopPropagation();
+                e.preventDefault();
+                state.draggedDevice = device;
+                state.wasDragging = false;
+                controls.enabled = false;
+            }
+        }
+
         function onMouseMove(e) {
             if (state.draggedDevice && state.mode === 'select') {
+                state.wasDragging = true;
+
                 const rect = renderer.domElement.getBoundingClientRect();
                 mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
                 mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
@@ -1094,7 +1135,12 @@
         }
 
         function onMouseUp() {
-            state.draggedDevice = null;
+            if (state.draggedDevice) {
+                setTimeout(() => {
+                    state.draggedDevice = null;
+                }, 10);
+                controls.enabled = true;
+            }
         }
 
         // Touch events
@@ -1203,12 +1249,75 @@
         // 프로퍼티 표시
         function showProperties(device) {
             const template = templates[device.type];
+
+            // Initialize ports data if not exists
+            if (!device.portsData) {
+                device.portsData = [];
+                for (let i = 0; i < template.ports; i++) {
+                    device.portsData.push({
+                        num: i,
+                        enabled: true,
+                        speed: 1000,
+                        vlan: 1,
+                        priority: 0,
+                        bandwidth: 0,
+                        connected: false
+                    });
+                }
+            }
+
+            let portsHTML = '';
+            device.portsData.forEach((port, i) => {
+                const portType = template.rj45Ports && i < template.rj45Ports ? 'RJ45' :
+                               template.mateNetPorts && i < template.mateNetPorts ? 'MateNET' :
+                               template.sfpPorts ? 'SFP' :
+                               template.sfpPlusPorts ? 'SFP+' : 'Port';
+
+                portsHTML += `
+                    <div class="port-detail-card">
+                        <div class="port-detail-header">
+                            <div class="port-detail-name">Port ${i} (${portType})</div>
+                            <div class="port-detail-status ${port.connected ? 'connected' : ''}"></div>
+                        </div>
+                        <div class="port-detail-info">
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px;">
+                                <div>
+                                    <label style="font-size: 10px; color: #666;">Speed (Mbps)</label>
+                                    <input type="number" class="form-input" style="padding: 6px; font-size: 12px;"
+                                           value="${port.speed}"
+                                           onchange="updatePortConfig('${device.id}', ${i}, 'speed', this.value)">
+                                </div>
+                                <div>
+                                    <label style="font-size: 10px; color: #666;">VLAN</label>
+                                    <input type="number" class="form-input" style="padding: 6px; font-size: 12px;"
+                                           value="${port.vlan}"
+                                           onchange="updatePortConfig('${device.id}', ${i}, 'vlan', this.value)">
+                                </div>
+                                <div>
+                                    <label style="font-size: 10px; color: #666;">Priority (0-7)</label>
+                                    <input type="number" class="form-input" style="padding: 6px; font-size: 12px;"
+                                           min="0" max="7" value="${port.priority}"
+                                           onchange="updatePortConfig('${device.id}', ${i}, 'priority', this.value)">
+                                </div>
+                                <div>
+                                    <label style="font-size: 10px; color: #666;">Bandwidth (Mbps)</label>
+                                    <input type="number" class="form-input" style="padding: 6px; font-size: 12px;"
+                                           value="${port.bandwidth}"
+                                           onchange="updatePortConfig('${device.id}', ${i}, 'bandwidth', this.value)">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+
             document.getElementById('propertiesContent').innerHTML = `
                 <div class="prop-section">
                     <div class="prop-title">Device Info</div>
                     <div class="form-group">
                         <label class="form-label">Name</label>
-                        <input type="text" class="form-input" value="${device.label}">
+                        <input type="text" class="form-input" value="${device.label}"
+                               onchange="updateDeviceName('${device.id}', this.value)">
                     </div>
                     <div class="form-group">
                         <label class="form-label">Type</label>
@@ -1219,9 +1328,31 @@
                         <span class="badge badge-info">${template.ports} Ports</span>
                     </div>
                 </div>
+
+                <div class="prop-section">
+                    <div class="prop-title">Port Configuration</div>
+                    ${portsHTML}
+                </div>
             `;
             document.getElementById('properties').classList.add('visible');
         }
+
+        // Global functions for port config updates
+        window.updatePortConfig = function(deviceId, portNum, field, value) {
+            const device = state.devices.get(deviceId);
+            if (device && device.portsData[portNum]) {
+                device.portsData[portNum][field] = parseFloat(value) || 0;
+                showToast(`Port ${portNum} ${field} updated to ${value}`);
+            }
+        };
+
+        window.updateDeviceName = function(deviceId, newName) {
+            const device = state.devices.get(deviceId);
+            if (device) {
+                device.label = newName;
+                showToast(`Device renamed to ${newName}`);
+            }
+        };
 
         // 버튼 이벤트
         document.querySelectorAll('.device-card[data-type]').forEach(card => {
