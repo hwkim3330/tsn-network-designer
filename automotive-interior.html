@@ -1,0 +1,706 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TSN Automotive Interior - 3D Vehicle Integration</title>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            overflow: hidden;
+        }
+
+        .app {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+
+        .header {
+            height: 80px;
+            background: rgba(255, 255, 255, 0.98);
+            backdrop-filter: blur(20px);
+            border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 32px;
+            box-shadow: 0 4px 24px rgba(0, 0, 0, 0.1);
+            z-index: 100;
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 24px;
+        }
+
+        .logo {
+            height: 48px;
+            width: auto;
+        }
+
+        .title-group h1 {
+            font-size: 22px;
+            font-weight: 700;
+            color: #0066FF;
+            margin-bottom: 4px;
+        }
+
+        .title-group p {
+            font-size: 13px;
+            color: #666;
+        }
+
+        .controls {
+            display: flex;
+            gap: 12px;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border-radius: 8px;
+            border: none;
+            font-weight: 600;
+            cursor: pointer;
+            font-size: 14px;
+            background: #0066FF;
+            color: white;
+            transition: all 0.2s;
+        }
+
+        .btn:hover {
+            background: #0052CC;
+            transform: translateY(-1px);
+        }
+
+        .btn.secondary {
+            background: white;
+            color: #0066FF;
+            border: 2px solid #0066FF;
+        }
+
+        .btn.secondary:hover {
+            background: #f0f7ff;
+        }
+
+        .canvas {
+            flex: 1;
+            position: relative;
+        }
+
+        #canvas3d {
+            width: 100%;
+            height: 100%;
+        }
+
+        .info-panel {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(20px);
+            border-radius: 12px;
+            padding: 20px;
+            min-width: 280px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
+        }
+
+        .info-title {
+            font-size: 14px;
+            font-weight: 700;
+            color: #0066FF;
+            margin-bottom: 12px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .info-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid #eee;
+            font-size: 13px;
+        }
+
+        .info-label {
+            color: #666;
+        }
+
+        .info-value {
+            font-weight: 600;
+            color: #1a1a1a;
+        }
+
+        .legend {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(20px);
+            border-radius: 12px;
+            padding: 16px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
+        }
+
+        .legend-title {
+            font-size: 12px;
+            font-weight: 700;
+            color: #0066FF;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 6px;
+            font-size: 12px;
+        }
+
+        .legend-color {
+            width: 20px;
+            height: 20px;
+            border-radius: 4px;
+            border: 1px solid #ddd;
+        }
+
+        .help-text {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+            padding: 12px 16px;
+            border-radius: 8px;
+            font-size: 12px;
+            backdrop-filter: blur(10px);
+        }
+
+        .toast {
+            position: fixed;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.9);
+            color: white;
+            padding: 14px 24px;
+            border-radius: 8px;
+            font-size: 14px;
+            opacity: 0;
+            transition: opacity 0.3s;
+            z-index: 1000;
+            pointer-events: none;
+        }
+
+        .toast.visible {
+            opacity: 1;
+        }
+    </style>
+</head>
+<body>
+    <div class="app">
+        <div class="header">
+            <div class="header-left">
+                <img src="keti.png" alt="KETI" class="logo">
+                <div class="title-group">
+                    <h1>TSN Automotive Interior - Vehicle Integration</h1>
+                    <p>Time-Sensitive Networking in Autonomous Vehicle</p>
+                </div>
+            </div>
+            <div class="controls">
+                <button class="btn secondary" id="viewDashboard">Dashboard View</button>
+                <button class="btn secondary" id="viewTrunk">Trunk View</button>
+                <button class="btn secondary" id="viewTop">Top View</button>
+                <button class="btn" id="toggleLabels">Toggle Labels</button>
+            </div>
+        </div>
+
+        <div class="canvas">
+            <div id="canvas3d"></div>
+
+            <div class="info-panel">
+                <div class="info-title">TSN System Info</div>
+                <div class="info-item">
+                    <span class="info-label">Main Gateway</span>
+                    <span class="info-value">LAN9692</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Zone Controllers</span>
+                    <span class="info-value">3x LAN9662</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Sensors</span>
+                    <span class="info-value">8 Total</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Network Speed</span>
+                    <span class="info-value">10 Gbps</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">PTP Sync</span>
+                    <span class="info-value">Active</span>
+                </div>
+            </div>
+
+            <div class="legend">
+                <div class="legend-title">Components</div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #00C853;"></div>
+                    <span>LAN9692 Gateway (Trunk)</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #0066FF;"></div>
+                    <span>LAN9662 Zone Controller</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #FFD700;"></div>
+                    <span>10G SFP+ Uplink</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #00BCD4;"></div>
+                    <span>Camera (100BASE-T1)</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #FF9800;"></div>
+                    <span>Radar (100BASE-T1)</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: #9C27B0;"></div>
+                    <span>LiDAR (1000BASE-T1)</span>
+                </div>
+            </div>
+
+            <div class="help-text">
+                <strong>Controls:</strong> Left Click = Rotate · Right Click = Pan · Scroll = Zoom
+            </div>
+        </div>
+    </div>
+
+    <div class="toast" id="toast"></div>
+
+    <script>
+        // Scene setup
+        const container = document.getElementById('canvas3d');
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x1a1a2e);
+        scene.fog = new THREE.Fog(0x1a1a2e, 50, 200);
+
+        const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(-15, 12, 25);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+        function updateSize() {
+            const width = container.clientWidth;
+            const height = container.clientHeight;
+            camera.aspect = width / height;
+            camera.updateProjectionMatrix();
+            renderer.setSize(width, height);
+        }
+        updateSize();
+        container.appendChild(renderer.domElement);
+        window.addEventListener('resize', updateSize);
+
+        // Controls
+        const controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+        controls.minDistance = 10;
+        controls.maxDistance = 80;
+        controls.maxPolarAngle = Math.PI / 1.8;
+
+        // Lighting
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+        scene.add(ambientLight);
+
+        const mainLight = new THREE.DirectionalLight(0xffffff, 0.8);
+        mainLight.position.set(20, 30, 20);
+        mainLight.castShadow = true;
+        mainLight.shadow.mapSize.width = 2048;
+        mainLight.shadow.mapSize.height = 2048;
+        mainLight.shadow.camera.near = 0.5;
+        mainLight.shadow.camera.far = 100;
+        mainLight.shadow.camera.left = -30;
+        mainLight.shadow.camera.right = 30;
+        mainLight.shadow.camera.top = 30;
+        mainLight.shadow.camera.bottom = -30;
+        scene.add(mainLight);
+
+        const fillLight = new THREE.DirectionalLight(0x6699ff, 0.3);
+        fillLight.position.set(-20, 10, -20);
+        scene.add(fillLight);
+
+        // Ground
+        const groundGeo = new THREE.PlaneGeometry(100, 100);
+        const groundMat = new THREE.MeshStandardMaterial({
+            color: 0x1a1a2e,
+            roughness: 0.8,
+            metalness: 0.2
+        });
+        const ground = new THREE.Mesh(groundGeo, groundMat);
+        ground.rotation.x = -Math.PI / 2;
+        ground.receiveShadow = true;
+        scene.add(ground);
+
+        // Grid
+        const gridHelper = new THREE.GridHelper(60, 60, 0x444444, 0x222222);
+        scene.add(gridHelper);
+
+        // Create simplified car body
+        function createCarBody() {
+            const carGroup = new THREE.Group();
+
+            // Main body (passenger cabin)
+            const bodyGeo = new THREE.BoxGeometry(10, 3, 5);
+            const bodyMat = new THREE.MeshStandardMaterial({
+                color: 0x2c3e50,
+                roughness: 0.3,
+                metalness: 0.7
+            });
+            const body = new THREE.Mesh(bodyGeo, bodyMat);
+            body.position.y = 1.5;
+            body.castShadow = true;
+            body.receiveShadow = true;
+            carGroup.add(body);
+
+            // Hood
+            const hoodGeo = new THREE.BoxGeometry(3, 1.5, 5);
+            const hood = new THREE.Mesh(hoodGeo, bodyMat);
+            hood.position.set(-6.5, 0.75, 0);
+            hood.castShadow = true;
+            carGroup.add(hood);
+
+            // Trunk
+            const trunkGeo = new THREE.BoxGeometry(2.5, 2, 5);
+            const trunk = new THREE.Mesh(trunkGeo, bodyMat);
+            trunk.position.set(6.25, 1, 0);
+            trunk.castShadow = true;
+            carGroup.add(trunk);
+
+            // Roof
+            const roofGeo = new THREE.BoxGeometry(8, 0.3, 4.5);
+            const roof = new THREE.Mesh(roofGeo, bodyMat);
+            roof.position.set(-0.5, 3.15, 0);
+            roof.castShadow = true;
+            carGroup.add(roof);
+
+            // Windshield
+            const windshieldGeo = new THREE.BoxGeometry(0.3, 2, 4.5);
+            const glassMat = new THREE.MeshPhysicalMaterial({
+                color: 0x88ccff,
+                transparent: true,
+                opacity: 0.3,
+                roughness: 0.1,
+                metalness: 0.1,
+                transmission: 0.9
+            });
+            const windshield = new THREE.Mesh(windshieldGeo, glassMat);
+            windshield.position.set(-4.5, 2, 0);
+            windshield.rotation.z = -0.3;
+            carGroup.add(windshield);
+
+            // Side windows
+            const windowGeo = new THREE.BoxGeometry(6, 2, 0.2);
+            const leftWindow = new THREE.Mesh(windowGeo, glassMat);
+            leftWindow.position.set(-0.5, 2, 2.4);
+            carGroup.add(leftWindow);
+
+            const rightWindow = new THREE.Mesh(windowGeo, glassMat);
+            rightWindow.position.set(-0.5, 2, -2.4);
+            carGroup.add(rightWindow);
+
+            // Wheels
+            const wheelGeo = new THREE.CylinderGeometry(0.8, 0.8, 0.5, 16);
+            const wheelMat = new THREE.MeshStandardMaterial({
+                color: 0x1a1a1a,
+                roughness: 0.8
+            });
+
+            const positions = [
+                [-4, 0.8, 2.7],
+                [-4, 0.8, -2.7],
+                [4, 0.8, 2.7],
+                [4, 0.8, -2.7]
+            ];
+
+            positions.forEach(pos => {
+                const wheel = new THREE.Mesh(wheelGeo, wheelMat);
+                wheel.rotation.z = Math.PI / 2;
+                wheel.position.set(...pos);
+                wheel.castShadow = true;
+                carGroup.add(wheel);
+            });
+
+            return carGroup;
+        }
+
+        // Create TSN board
+        function createTSNBoard(type, color, label) {
+            const group = new THREE.Group();
+
+            // Board PCB
+            const boardGeo = new THREE.BoxGeometry(1.5, 0.1, 1);
+            const boardMat = new THREE.MeshStandardMaterial({
+                color: 0x2a5f2a,
+                roughness: 0.7,
+                metalness: 0.3
+            });
+            const board = new THREE.Mesh(boardGeo, boardMat);
+            board.castShadow = true;
+            group.add(board);
+
+            // Chip
+            const chipGeo = new THREE.BoxGeometry(0.6, 0.2, 0.4);
+            const chipMat = new THREE.MeshStandardMaterial({
+                color: color,
+                roughness: 0.2,
+                metalness: 0.8,
+                emissive: color,
+                emissiveIntensity: 0.3
+            });
+            const chip = new THREE.Mesh(chipGeo, chipMat);
+            chip.position.y = 0.15;
+            group.add(chip);
+
+            // Ports (small connectors)
+            for (let i = 0; i < 4; i++) {
+                const portGeo = new THREE.BoxGeometry(0.15, 0.15, 0.1);
+                const portMat = new THREE.MeshStandardMaterial({
+                    color: 0x444444,
+                    metalness: 0.8
+                });
+                const port = new THREE.Mesh(portGeo, portMat);
+                port.position.set(-0.6 + i * 0.4, 0.1, 0.55);
+                group.add(port);
+            }
+
+            // Label
+            if (label) {
+                const canvas = document.createElement('canvas');
+                canvas.width = 256;
+                canvas.height = 128;
+                const ctx = canvas.getContext('2d');
+                ctx.fillStyle = '#ffffff';
+                ctx.font = 'bold 48px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText(label, 128, 80);
+
+                const texture = new THREE.CanvasTexture(canvas);
+                const labelGeo = new THREE.PlaneGeometry(1, 0.5);
+                const labelMat = new THREE.MeshBasicMaterial({
+                    map: texture,
+                    transparent: true,
+                    side: THREE.DoubleSide
+                });
+                const labelMesh = new THREE.Mesh(labelGeo, labelMat);
+                labelMesh.position.y = 0.6;
+                labelMesh.rotation.x = -Math.PI / 6;
+                group.add(labelMesh);
+            }
+
+            return group;
+        }
+
+        // Create sensor
+        function createSensor(type, color, label) {
+            const group = new THREE.Group();
+
+            const sensorGeo = new THREE.CylinderGeometry(0.3, 0.3, 0.5, 16);
+            const sensorMat = new THREE.MeshStandardMaterial({
+                color: color,
+                roughness: 0.3,
+                metalness: 0.7,
+                emissive: color,
+                emissiveIntensity: 0.2
+            });
+            const sensor = new THREE.Mesh(sensorGeo, sensorMat);
+            sensor.castShadow = true;
+            group.add(sensor);
+
+            // Lens
+            const lensGeo = new THREE.CircleGeometry(0.2, 16);
+            const lensMat = new THREE.MeshStandardMaterial({
+                color: 0x111111,
+                roughness: 0.1,
+                metalness: 0.9
+            });
+            const lens = new THREE.Mesh(lensGeo, lensMat);
+            lens.position.y = 0.26;
+            lens.rotation.x = -Math.PI / 2;
+            group.add(lens);
+
+            return group;
+        }
+
+        // Create connection line
+        function createConnection(from, to, color = 0xFFD700) {
+            const points = [from, to];
+            const geometry = new THREE.BufferGeometry().setFromPoints(points);
+            const material = new THREE.LineBasicMaterial({
+                color: color,
+                linewidth: 2,
+                transparent: true,
+                opacity: 0.6
+            });
+            return new THREE.Line(geometry, material);
+        }
+
+        // Build the scene
+        const car = createCarBody();
+        scene.add(car);
+
+        // Main Gateway (LAN9692) in trunk
+        const gateway = createTSNBoard('gateway', 0x00C853, 'LAN9692');
+        gateway.position.set(6, 1.5, 0);
+        gateway.rotation.y = Math.PI / 2;
+        scene.add(gateway);
+
+        // Zone Controller 1 (Dashboard - LAN9662)
+        const zoneCtrl1 = createTSNBoard('zone', 0x0066FF, 'Z1-9662');
+        zoneCtrl1.position.set(-5, 1, 0);
+        zoneCtrl1.rotation.y = -Math.PI / 2;
+        scene.add(zoneCtrl1);
+
+        // Zone Controller 2 (Left side - LAN9662)
+        const zoneCtrl2 = createTSNBoard('zone', 0x0066FF, 'Z2-9662');
+        zoneCtrl2.position.set(0, 1, -3);
+        scene.add(zoneCtrl2);
+
+        // Zone Controller 3 (Right side - LAN9662)
+        const zoneCtrl3 = createTSNBoard('zone', 0x0066FF, 'Z3-9662');
+        zoneCtrl3.position.set(0, 1, 3);
+        scene.add(zoneCtrl3);
+
+        // Front cameras
+        const frontCamLeft = createSensor('camera', 0x00BCD4);
+        frontCamLeft.position.set(-7.5, 2, 1.5);
+        frontCamLeft.rotation.z = Math.PI / 2;
+        scene.add(frontCamLeft);
+
+        const frontCamRight = createSensor('camera', 0x00BCD4);
+        frontCamRight.position.set(-7.5, 2, -1.5);
+        frontCamRight.rotation.z = Math.PI / 2;
+        scene.add(frontCamRight);
+
+        // Side cameras
+        const sideCamLeft = createSensor('camera', 0x00BCD4);
+        sideCamLeft.position.set(2, 2, 2.8);
+        sideCamLeft.rotation.z = Math.PI / 2;
+        sideCamLeft.rotation.y = -Math.PI / 2;
+        scene.add(sideCamLeft);
+
+        const sideCamRight = createSensor('camera', 0x00BCD4);
+        sideCamRight.position.set(2, 2, -2.8);
+        sideCamRight.rotation.z = Math.PI / 2;
+        sideCamRight.rotation.y = Math.PI / 2;
+        scene.add(sideCamRight);
+
+        // Rear camera
+        const rearCam = createSensor('camera', 0x00BCD4);
+        rearCam.position.set(7.5, 2, 0);
+        rearCam.rotation.z = Math.PI / 2;
+        rearCam.rotation.y = Math.PI;
+        scene.add(rearCam);
+
+        // Front radars
+        const frontRadar = createSensor('radar', 0xFF9800);
+        frontRadar.position.set(-8, 1, 0);
+        frontRadar.rotation.z = Math.PI / 2;
+        scene.add(frontRadar);
+
+        // LiDAR on roof
+        const lidar = createSensor('lidar', 0x9C27B0);
+        lidar.position.set(-1, 3.8, 0);
+        lidar.scale.set(1.5, 1.5, 1.5);
+        scene.add(lidar);
+
+        // Create connections
+        const connections = [
+            // Gateway to zone controllers (10G)
+            createConnection(gateway.position, zoneCtrl1.position, 0xFFD700),
+            createConnection(gateway.position, zoneCtrl2.position, 0xFFD700),
+            createConnection(gateway.position, zoneCtrl3.position, 0xFFD700),
+
+            // Zone 1 to front sensors
+            createConnection(zoneCtrl1.position, frontCamLeft.position, 0x00BCD4),
+            createConnection(zoneCtrl1.position, frontCamRight.position, 0x00BCD4),
+            createConnection(zoneCtrl1.position, frontRadar.position, 0xFF9800),
+            createConnection(zoneCtrl1.position, lidar.position, 0x9C27B0),
+
+            // Zone 2 to left sensors
+            createConnection(zoneCtrl2.position, sideCamLeft.position, 0x00BCD4),
+
+            // Zone 3 to right sensors
+            createConnection(zoneCtrl3.position, sideCamRight.position, 0x00BCD4),
+            createConnection(zoneCtrl3.position, rearCam.position, 0x00BCD4)
+        ];
+
+        connections.forEach(conn => scene.add(conn));
+
+        // View presets
+        document.getElementById('viewDashboard').addEventListener('click', () => {
+            camera.position.set(-12, 8, 8);
+            controls.target.set(-5, 1, 0);
+            controls.update();
+            showToast('Dashboard View');
+        });
+
+        document.getElementById('viewTrunk').addEventListener('click', () => {
+            camera.position.set(12, 8, 8);
+            controls.target.set(6, 1.5, 0);
+            controls.update();
+            showToast('Trunk View - Main Gateway');
+        });
+
+        document.getElementById('viewTop').addEventListener('click', () => {
+            camera.position.set(0, 25, 0.1);
+            controls.target.set(0, 0, 0);
+            controls.update();
+            showToast('Top View');
+        });
+
+        let labelsVisible = true;
+        document.getElementById('toggleLabels').addEventListener('click', () => {
+            labelsVisible = !labelsVisible;
+            scene.traverse(obj => {
+                if (obj.material && obj.material.map && obj.geometry.type === 'PlaneGeometry') {
+                    obj.visible = labelsVisible;
+                }
+            });
+            showToast(labelsVisible ? 'Labels ON' : 'Labels OFF');
+        });
+
+        function showToast(msg) {
+            const toast = document.getElementById('toast');
+            toast.textContent = msg;
+            toast.classList.add('visible');
+            setTimeout(() => toast.classList.remove('visible'), 2000);
+        }
+
+        // Animation loop
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+            renderer.render(scene, camera);
+        }
+
+        animate();
+        showToast('TSN Automotive System Loaded');
+    </script>
+</body>
+</html>
