@@ -434,16 +434,15 @@
                             <div class="device-icon">🔷</div>
                             <div class="device-info">
                                 <h3>LAN9662</h3>
-                                <p>12-Port TSN Switch</p>
+                                <p>4-Port TSN Switch</p>
                             </div>
                         </div>
                         <div class="device-specs">
                             <strong>Physical Ports:</strong><br>
-                            • 7× MateNET (Industrial Ethernet)<br>
-                            • 4× SFP (Fiber, 1G)<br>
-                            • 1× RJ45 (Management)<br>
+                            • 2× RJ45 (Copper, 1G)<br>
+                            • 2× SFP (Fiber, 1G)<br>
                             <br>
-                            <strong>Total: 12 Ports</strong><br>
+                            <strong>Total: 4 Ports</strong><br>
                             IEEE 802.1Qbv/Qav/Qbu · PTP
                         </div>
                     </div>
@@ -453,17 +452,17 @@
                             <div class="device-icon">🟢</div>
                             <div class="device-info">
                                 <h3>LAN9692</h3>
-                                <p>10-Port TSN Switch</p>
+                                <p>12-Port TSN Switch</p>
                             </div>
                         </div>
                         <div class="device-specs">
                             <strong>Physical Ports:</strong><br>
-                            • 8× RJ45 (Copper, 1G)<br>
-                            • 2× SFP (Fiber, 1G)<br>
-                            • 2× SFP+ (Fiber, 10G) ⚡<br>
+                            • 7× MateNET T1 (100/1000BASE-T1)<br>
+                            • 4× SFP+ (Fiber, 1G/10G) ⚡<br>
+                            • 1× RJ45 (Management)<br>
                             <br>
                             <strong>Total: 12 Ports</strong><br>
-                            More expansion than LAN9662
+                            Industrial Ethernet with 10G uplinks
                         </div>
                     </div>
                 </div>
@@ -592,6 +591,11 @@
         controls.dampingFactor = 0.05;
         controls.minDistance = 20;
         controls.maxDistance = 100;
+        controls.mouseButtons = {
+            LEFT: null,  // Disable left click for orbit (use for selection)
+            MIDDLE: THREE.MOUSE.DOLLY,
+            RIGHT: THREE.MOUSE.ROTATE
+        };
 
         // 조명
         const ambientLight = new THREE.AmbientLight(0xFFFFFF, 0.6);
@@ -635,11 +639,10 @@
             lan9662: {
                 label: 'LAN9662',
                 color: 0x0066FF,
-                ports: 12,
-                mateNetPorts: 7,
-                sfpPorts: 4,
-                mgmtRj45: 1,
-                size: { w: 9, h: 3, d: 5 }
+                ports: 4,
+                rj45Ports: 2,        // Standard RJ45 Ethernet ports
+                sfpPorts: 2,         // SFP fiber optic slots
+                size: { w: 6, h: 2.5, d: 4 }
             },
             lan9692: {
                 label: 'LAN9692',
@@ -1064,7 +1067,6 @@
                     // Select mode - allow dragging
                     selectDevice(device);
                     state.draggedDevice = device;
-                    controls.enabled = false;
                 }
             } else {
                 // Clicked on empty space
@@ -1092,10 +1094,7 @@
         }
 
         function onMouseUp() {
-            if (state.mode === 'select') {
-                state.draggedDevice = null;
-                controls.enabled = true;
-            }
+            state.draggedDevice = null;
         }
 
         // Touch events
@@ -1166,7 +1165,6 @@
                     state.draggedDevice.position.copy(intersection);
                     state.draggedDevice.mesh.position.copy(intersection);
                     updateConnections();
-                    controls.enabled = false;
                 }
             }
         }
@@ -1183,7 +1181,6 @@
 
             state.draggedDevice = null;
             state.isTouchDragging = false;
-            controls.enabled = true;
         }
 
         // 통계 업데이트
@@ -1283,17 +1280,79 @@
             document.getElementById('properties').classList.remove('visible');
         });
 
+        // Intelligent Zone-based Auto Layout (like ZoneController)
         document.getElementById('layoutBtn').addEventListener('click', () => {
             const devices = Array.from(state.devices.values());
-            const radius = 20;
-            devices.forEach((device, i) => {
-                const angle = (Math.PI * 2 * i) / devices.length;
-                device.position.set(Math.cos(angle) * radius, 0, Math.sin(angle) * radius);
+
+            // Categorize devices into zones
+            const switches = devices.filter(d => d.type === 'lan9662' || d.type === 'lan9692');
+            const sensors = devices.filter(d => d.type === 'camera' || d.type === 'lidar' || d.type === 'radar');
+            const ecus = devices.filter(d => d.type === 'ecu');
+
+            // Layout switches in center
+            switches.forEach((device, i) => {
+                const offset = (i - (switches.length - 1) / 2) * 12;
+                device.position.set(offset, 0, 0);
                 device.mesh.position.copy(device.position);
             });
+
+            // Layout sensors in arc around switches
+            sensors.forEach((device, i) => {
+                const angle = Math.PI * 0.75 - (i / Math.max(1, sensors.length - 1)) * Math.PI * 0.5;
+                const radius = 25;
+                device.position.set(Math.cos(angle) * radius, 0, Math.sin(angle) * radius + 5);
+                device.mesh.position.copy(device.position);
+            });
+
+            // Layout ECUs below switches
+            ecus.forEach((device, i) => {
+                const offset = (i - (ecus.length - 1) / 2) * 10;
+                device.position.set(offset, 0, -20);
+                device.mesh.position.copy(device.position);
+            });
+
             updateConnections();
-            showToast('Layout applied');
+            autoConnect();
+            showToast('Smart layout applied - Zone-based positioning');
         });
+
+        // Smart auto-connect based on topology
+        function autoConnect() {
+            const devices = Array.from(state.devices.values());
+            const switches = devices.filter(d => d.type === 'lan9662' || d.type === 'lan9692');
+            const endpoints = devices.filter(d => d.type !== 'lan9662' && d.type !== 'lan9692');
+
+            // Clear existing connections
+            state.connections.forEach(conn => scene.remove(conn.line));
+            state.connections = [];
+
+            if (switches.length === 0) return;
+
+            // Connect all endpoints to nearest switch
+            endpoints.forEach(endpoint => {
+                let nearestSwitch = switches[0];
+                let minDist = endpoint.position.distanceTo(nearestSwitch.position);
+
+                switches.forEach(sw => {
+                    const dist = endpoint.position.distanceTo(sw.position);
+                    if (dist < minDist) {
+                        minDist = dist;
+                        nearestSwitch = sw;
+                    }
+                });
+
+                createConnection(endpoint, nearestSwitch);
+            });
+
+            // If multiple switches, connect them together
+            if (switches.length > 1) {
+                for (let i = 0; i < switches.length - 1; i++) {
+                    createConnection(switches[i], switches[i + 1]);
+                }
+            }
+
+            updateStats();
+        }
 
         document.getElementById('exportBtn').addEventListener('click', () => {
             const config = {
