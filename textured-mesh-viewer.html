@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Hyundai TSN Integration - Real 3D Model</title>
+    <title>Textured Mesh TSN Viewer - 3D Integration</title>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
@@ -431,8 +431,8 @@
             <div class="header-left">
                 <img src="keti.png" alt="KETI" class="logo">
                 <div class="title-group">
-                    <h1>Hyundai TSN Integration Viewer</h1>
-                    <p>Real 3D Model with Time-Sensitive Networking</p>
+                    <h1>Textured Mesh TSN Viewer</h1>
+                    <p>3D Vehicle Model with TSN Integration</p>
                 </div>
             </div>
             <div class="controls">
@@ -465,9 +465,9 @@
                 </button>
                 <div class="model-info">
                     <strong>Supported Formats:</strong> GLB, GLTF<br>
-                    <strong>Recommended:</strong> Hyundai Santa Fe, Ioniq, or any vehicle model<br>
+                    <strong>Default Model:</strong> Textured mesh vehicle with detailed geometry<br>
                     <strong>Download Free Models:</strong>
-                    <a href="https://sketchfab.com/tags/hyundai" target="_blank" style="color: #00BCD4;">Sketchfab</a>
+                    <a href="https://sketchfab.com" target="_blank" style="color: #00BCD4;">Sketchfab</a>
                 </div>
             </div>
 
@@ -1130,7 +1130,7 @@
         }
 
         // Auto-load default model
-        loadModel('./Creta.glb', 'Hyundai Creta');
+        loadModel('./textured_mesh.glb', 'Textured Mesh Vehicle');
 
         document.getElementById('fileInput').addEventListener('change', (e) => {
             const file = e.target.files[0];
