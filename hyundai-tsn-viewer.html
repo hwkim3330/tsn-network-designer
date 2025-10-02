@@ -319,6 +319,8 @@
             </div>
             <div class="controls">
                 <button class="btn" id="uploadBtn">📁 Load 3D Model</button>
+                <button class="btn" id="toggleExterior">🚗 Hide Exterior</button>
+                <button class="btn" id="editMode">✏️ Edit Mode</button>
                 <button class="btn" id="viewExterior">Exterior</button>
                 <button class="btn" id="viewDashboard">Dashboard</button>
                 <button class="btn" id="viewTrunk">Trunk</button>
@@ -496,11 +498,22 @@
         let carModel = null;
         let tsnGroup = new THREE.Group();
         let tsnVisible = false;
+        let exteriorVisible = true;
+        let editMode = false;
+        let selectedTSNComponent = null;
+        let tsnConnections = [];
         scene.add(tsnGroup);
+
+        // Raycaster for picking
+        const raycaster = new THREE.Raycaster();
+        const mouse = new THREE.Vector2();
 
         // TSN Components
         function createTSNBoard(color, label, scale = 1) {
             const group = new THREE.Group();
+            group.userData.tsnType = 'board';
+            group.userData.label = label;
+            group.userData.draggable = true;
 
             const boardGeo = new THREE.BoxGeometry(0.3 * scale, 0.02 * scale, 0.2 * scale);
             const boardMat = new THREE.MeshStandardMaterial({
@@ -540,6 +553,8 @@
 
         function createSensor(color, scale = 1) {
             const group = new THREE.Group();
+            group.userData.tsnType = 'sensor';
+            group.userData.draggable = true;
 
             const sensorGeo = new THREE.CylinderGeometry(0.06 * scale, 0.06 * scale, 0.12 * scale, 16);
             const sensorMat = new THREE.MeshStandardMaterial({
@@ -554,6 +569,43 @@
             group.add(sensor);
 
             return group;
+        }
+
+        function createConnection(from, to, color = 0xFFD700) {
+            const points = [];
+            points.push(from.clone());
+            points.push(to.clone());
+
+            const geometry = new THREE.BufferGeometry().setFromPoints(points);
+            const material = new THREE.LineBasicMaterial({
+                color: color,
+                linewidth: 3,
+                transparent: true,
+                opacity: 0.6
+            });
+
+            const line = new THREE.Line(geometry, material);
+            line.userData.isConnection = true;
+            return line;
+        }
+
+        function updateConnections() {
+            // Remove old connections
+            tsnConnections.forEach(conn => scene.remove(conn));
+            tsnConnections = [];
+
+            if (!tsnVisible) return;
+
+            // Create connections between TSN components
+            const components = tsnGroup.children.filter(c => c.userData.tsnType);
+
+            for (let i = 0; i < components.length - 1; i++) {
+                const from = components[i].position;
+                const to = components[i + 1].position;
+                const conn = createConnection(from, to, 0xFFD700);
+                scene.add(conn);
+                tsnConnections.push(conn);
+            }
         }
 
         function setupTSNComponents() {
@@ -604,7 +656,92 @@
             });
 
             tsnGroup.visible = tsnVisible;
+            updateConnections();
         }
+
+        // Toggle exterior body parts
+        function toggleExterior() {
+            if (!carModel) return;
+
+            carModel.traverse((node) => {
+                if (node.isMesh && node.name.toLowerCase().includes('body')) {
+                    node.visible = exteriorVisible;
+                } else if (node.isMesh && (
+                    node.name.toLowerCase().includes('door') ||
+                    node.name.toLowerCase().includes('hood') ||
+                    node.name.toLowerCase().includes('trunk') ||
+                    node.name.toLowerCase().includes('roof') ||
+                    node.name.toLowerCase().includes('fender') ||
+                    node.name.toLowerCase().includes('quarter') ||
+                    node.name.toLowerCase().includes('bumper')
+                )) {
+                    node.visible = exteriorVisible;
+                }
+            });
+        }
+
+        // Mouse interaction for edit mode
+        let isDragging = false;
+        let dragPlane = new THREE.Plane();
+        let dragOffset = new THREE.Vector3();
+        let dragIntersection = new THREE.Vector3();
+
+        function onMouseDown(event) {
+            if (!editMode || !tsnVisible) return;
+
+            mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+            mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+            raycaster.setFromCamera(mouse, camera);
+            const intersects = raycaster.intersectObjects(tsnGroup.children, true);
+
+            if (intersects.length > 0) {
+                let selected = intersects[0].object;
+                while (selected.parent && selected.parent !== tsnGroup) {
+                    selected = selected.parent;
+                }
+
+                if (selected.userData.draggable) {
+                    selectedTSNComponent = selected;
+                    isDragging = true;
+                    controls.enabled = false;
+
+                    // Create drag plane at component position
+                    dragPlane.setFromNormalAndCoplanarPoint(
+                        camera.getWorldDirection(dragPlane.normal),
+                        selected.position
+                    );
+
+                    raycaster.ray.intersectPlane(dragPlane, dragIntersection);
+                    dragOffset.copy(dragIntersection).sub(selected.position);
+                }
+            }
+        }
+
+        function onMouseMove(event) {
+            if (!isDragging || !selectedTSNComponent) return;
+
+            mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+            mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+            raycaster.setFromCamera(mouse, camera);
+
+            if (raycaster.ray.intersectPlane(dragPlane, dragIntersection)) {
+                selectedTSNComponent.position.copy(dragIntersection.sub(dragOffset));
+                updateConnections();
+            }
+        }
+
+        function onMouseUp() {
+            isDragging = false;
+            selectedTSNComponent = null;
+            controls.enabled = true;
+        }
+
+        renderer.domElement.addEventListener('mousedown', onMouseDown);
+        renderer.domElement.addEventListener('mousemove', onMouseMove);
+        renderer.domElement.addEventListener('mouseup', onMouseUp);
+
 
         // File loader
         const loader = new THREE.GLTFLoader();
@@ -710,7 +847,24 @@
             tsnVisible = !tsnVisible;
             tsnGroup.visible = tsnVisible;
             this.classList.toggle('active');
+            this.textContent = tsnVisible ? 'Hide TSN' : 'Show TSN';
+            updateConnections();
             showToast(tsnVisible ? 'TSN Components Visible' : 'TSN Components Hidden');
+        });
+
+        document.getElementById('toggleExterior').addEventListener('click', function() {
+            exteriorVisible = !exteriorVisible;
+            toggleExterior();
+            this.classList.toggle('active');
+            this.textContent = exteriorVisible ? '🚗 Hide Exterior' : '🚗 Show Exterior';
+            showToast(exteriorVisible ? 'Exterior Visible' : 'Exterior Hidden - Interior View');
+        });
+
+        document.getElementById('editMode').addEventListener('click', function() {
+            editMode = !editMode;
+            this.classList.toggle('active');
+            this.textContent = editMode ? '✏️ View Mode' : '✏️ Edit Mode';
+            showToast(editMode ? 'Edit Mode - Drag TSN Components' : 'View Mode');
         });
 
         document.getElementById('uploadBtn').addEventListener('click', () => {
