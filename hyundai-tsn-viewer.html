@@ -605,14 +605,10 @@
         // File loader
         const loader = new THREE.GLTFLoader();
 
-        document.getElementById('fileInput').addEventListener('change', (e) => {
-            const file = e.target.files[0];
-            if (!file) return;
-
+        // Auto-load Hyundai Creta model from GitHub
+        function loadModel(url, fileName = 'Hyundai Creta') {
             document.getElementById('uploadZone').style.display = 'none';
             document.getElementById('loading').style.display = 'block';
-
-            const url = URL.createObjectURL(file);
 
             loader.load(
                 url,
@@ -651,11 +647,13 @@
                     document.getElementById('loading').style.display = 'none';
                     document.getElementById('infoPanel').style.display = 'block';
                     document.getElementById('legend').style.display = 'block';
-                    document.getElementById('modelName').textContent = file.name.replace(/\.(glb|gltf)$/i, '');
+                    document.getElementById('modelName').textContent = fileName;
 
                     showToast('✓ Model Loaded Successfully');
 
-                    URL.revokeObjectURL(url);
+                    if (url.startsWith('blob:')) {
+                        URL.revokeObjectURL(url);
+                    }
                 },
                 (progress) => {
                     const percent = (progress.loaded / progress.total * 100).toFixed(0);
@@ -668,6 +666,18 @@
                     document.getElementById('uploadZone').style.display = 'block';
                 }
             );
+        }
+
+        // Auto-load default model
+        loadModel('https://github.com/hwkim3330/tsn-network-designer/raw/refs/heads/main/Creta.glb', 'Hyundai Creta');
+
+        document.getElementById('fileInput').addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const url = URL.createObjectURL(file);
+            const fileName = file.name.replace(/\.(glb|gltf)$/i, '');
+            loadModel(url, fileName);
         });
 
         // View controls
@@ -730,7 +740,6 @@
         }
 
         animate();
-        showToast('Ready - Load your Hyundai 3D model');
     </script>
 </body>
 </html>
