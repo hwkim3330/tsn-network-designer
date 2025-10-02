@@ -415,8 +415,8 @@
         // Scene setup
         const container = document.getElementById('canvas3d');
         const scene = new THREE.Scene();
-        scene.background = new THREE.Color(0x0f0c29);
-        scene.fog = new THREE.Fog(0x0f0c29, 30, 100);
+        scene.background = new THREE.Color(0x1a1a2e);
+        scene.fog = new THREE.Fog(0x1a1a2e, 50, 120);
 
         const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 1000);
         camera.position.set(8, 4, 12);
@@ -425,7 +425,7 @@
         renderer.shadowMap.enabled = true;
         renderer.shadowMap.type = THREE.PCFSoftShadowMap;
         renderer.toneMapping = THREE.ACESFilmicToneMapping;
-        renderer.toneMappingExposure = 1.2;
+        renderer.toneMappingExposure = 1.5;
 
         function updateSize() {
             const width = container.clientWidth;
@@ -446,11 +446,11 @@
         controls.maxDistance = 40;
         controls.maxPolarAngle = Math.PI / 1.5;
 
-        // Lighting
-        const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+        // Lighting - Brighter setup
+        const ambientLight = new THREE.AmbientLight(0xffffff, 1.2);
         scene.add(ambientLight);
 
-        const mainLight = new THREE.DirectionalLight(0xffffff, 1.0);
+        const mainLight = new THREE.DirectionalLight(0xffffff, 1.8);
         mainLight.position.set(10, 15, 10);
         mainLight.castShadow = true;
         mainLight.shadow.mapSize.width = 2048;
@@ -463,20 +463,24 @@
         mainLight.shadow.camera.bottom = -15;
         scene.add(mainLight);
 
-        const fillLight = new THREE.DirectionalLight(0x4488ff, 0.4);
+        const fillLight = new THREE.DirectionalLight(0xffffff, 0.8);
         fillLight.position.set(-10, 8, -10);
         scene.add(fillLight);
 
-        const backLight = new THREE.DirectionalLight(0xff8844, 0.3);
+        const backLight = new THREE.DirectionalLight(0xffffff, 0.6);
         backLight.position.set(0, 5, -15);
         scene.add(backLight);
+
+        const topLight = new THREE.DirectionalLight(0xffffff, 0.5);
+        topLight.position.set(0, 20, 0);
+        scene.add(topLight);
 
         // Ground
         const groundGeo = new THREE.CircleGeometry(50, 64);
         const groundMat = new THREE.MeshStandardMaterial({
-            color: 0x1a1a2e,
-            roughness: 0.8,
-            metalness: 0.2
+            color: 0x2a2a3e,
+            roughness: 0.7,
+            metalness: 0.3
         });
         const ground = new THREE.Mesh(groundGeo, groundMat);
         ground.rotation.x = -Math.PI / 2;
@@ -484,8 +488,8 @@
         scene.add(ground);
 
         // Grid
-        const gridHelper = new THREE.PolarGridHelper(20, 16, 8, 64, 0x0066FF, 0x444444);
-        gridHelper.material.opacity = 0.3;
+        const gridHelper = new THREE.PolarGridHelper(20, 16, 8, 64, 0x0066FF, 0x555555);
+        gridHelper.material.opacity = 0.4;
         gridHelper.material.transparent = true;
         scene.add(gridHelper);
 
@@ -669,7 +673,7 @@
         }
 
         // Auto-load default model
-        loadModel('./CarConcept.glb', 'Concept Car');
+        loadModel('./Creta.glb', 'Hyundai Creta');
 
         document.getElementById('fileInput').addEventListener('change', (e) => {
             const file = e.target.files[0];
