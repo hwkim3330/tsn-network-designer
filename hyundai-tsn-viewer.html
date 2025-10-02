@@ -305,6 +305,124 @@
             font-size: 13px;
             color: #666;
         }
+
+        .parts-panel {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(0, 0, 0, 0.9);
+            backdrop-filter: blur(20px);
+            border: 2px solid #0066FF;
+            border-radius: 12px;
+            padding: 20px;
+            min-width: 280px;
+            max-height: 80vh;
+            overflow-y: auto;
+            display: none;
+            z-index: 200;
+        }
+
+        .parts-panel.visible {
+            display: block;
+        }
+
+        .parts-title {
+            font-size: 16px;
+            font-weight: 700;
+            color: #00BCD4;
+            margin-bottom: 16px;
+            text-transform: uppercase;
+        }
+
+        .part-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px;
+            margin-bottom: 8px;
+            background: rgba(0, 102, 255, 0.1);
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .part-item:hover {
+            background: rgba(0, 102, 255, 0.2);
+        }
+
+        .part-item.hidden {
+            opacity: 0.5;
+            background: rgba(255, 0, 0, 0.1);
+        }
+
+        .part-name {
+            color: #fff;
+            font-size: 14px;
+        }
+
+        .part-toggle {
+            width: 40px;
+            height: 20px;
+            background: #666;
+            border-radius: 10px;
+            position: relative;
+            transition: background 0.3s;
+        }
+
+        .part-toggle.active {
+            background: #0066FF;
+        }
+
+        .part-toggle::after {
+            content: '';
+            position: absolute;
+            width: 16px;
+            height: 16px;
+            background: white;
+            border-radius: 50%;
+            top: 2px;
+            left: 2px;
+            transition: left 0.3s;
+        }
+
+        .part-toggle.active::after {
+            left: 22px;
+        }
+
+        .add-panel {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.9);
+            backdrop-filter: blur(20px);
+            border: 2px solid #0066FF;
+            border-radius: 12px;
+            padding: 20px;
+            display: none;
+            z-index: 200;
+        }
+
+        .add-panel.visible {
+            display: flex;
+            gap: 12px;
+        }
+
+        .add-btn {
+            padding: 12px 20px;
+            border-radius: 8px;
+            border: 2px solid;
+            background: rgba(0, 0, 0, 0.5);
+            color: white;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .add-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 188, 212, 0.4);
+        }
     </style>
 </head>
 <body>
@@ -318,12 +436,11 @@
                 </div>
             </div>
             <div class="controls">
-                <button class="btn" id="uploadBtn">📁 Load 3D Model</button>
-                <button class="btn" id="toggleExterior">🚗 Hide Exterior</button>
+                <button class="btn" id="uploadBtn">📁 Load Model</button>
+                <button class="btn" id="partSelector">🔧 Body Parts</button>
+                <button class="btn" id="addComponent">➕ Add TSN</button>
                 <button class="btn" id="editMode">✏️ Edit Mode</button>
-                <button class="btn" id="viewExterior">Exterior</button>
-                <button class="btn" id="viewDashboard">Dashboard</button>
-                <button class="btn" id="viewTrunk">Trunk</button>
+                <button class="btn" id="autoRotate">🔄 Auto Rotate</button>
                 <button class="btn" id="toggleTSN">Show TSN</button>
             </div>
         </div>
@@ -416,6 +533,32 @@
             <div class="help-text">
                 <strong>Camera:</strong> Left Drag = Rotate · Right Drag = Pan · Scroll = Zoom
             </div>
+
+            <div class="parts-panel" id="partsPanel">
+                <div class="parts-title">Car Body Parts</div>
+                <div id="partsList"></div>
+            </div>
+
+            <div class="add-panel" id="addPanel">
+                <button class="add-btn" style="border-color: #00C853; color: #00C853;" onclick="addTSNComponent('gateway')">
+                    Gateway
+                </button>
+                <button class="add-btn" style="border-color: #0066FF; color: #0066FF;" onclick="addTSNComponent('zone')">
+                    Zone Ctrl
+                </button>
+                <button class="add-btn" style="border-color: #00BCD4; color: #00BCD4;" onclick="addTSNComponent('camera')">
+                    Camera
+                </button>
+                <button class="add-btn" style="border-color: #FF9800; color: #FF9800;" onclick="addTSNComponent('radar')">
+                    Radar
+                </button>
+                <button class="add-btn" style="border-color: #9C27B0; color: #9C27B0;" onclick="addTSNComponent('lidar')">
+                    LiDAR
+                </button>
+                <button class="add-btn" style="border-color: #4CAF50; color: #4CAF50;" onclick="addTSNComponent('ultrasonic')">
+                    Ultrasonic
+                </button>
+            </div>
         </div>
     </div>
 
@@ -456,6 +599,8 @@
         controls.minDistance = 3;
         controls.maxDistance = 40;
         controls.maxPolarAngle = Math.PI / 1.5;
+        controls.autoRotate = false;
+        controls.autoRotateSpeed = 1.0;
 
         // Lighting - Studio bright setup
         const ambientLight = new THREE.AmbientLight(0xffffff, 2.0);
@@ -755,25 +900,100 @@
             updateConnections();
         }
 
-        // Toggle exterior body parts
-        function toggleExterior() {
+        // Body parts management
+        let bodyParts = [];
+
+        function analyzeBodyParts() {
             if (!carModel) return;
 
+            bodyParts = [];
+            const partsList = document.getElementById('partsList');
+            partsList.innerHTML = '';
+
             carModel.traverse((node) => {
-                if (node.isMesh && node.name.toLowerCase().includes('body')) {
-                    node.visible = exteriorVisible;
-                } else if (node.isMesh && (
-                    node.name.toLowerCase().includes('door') ||
-                    node.name.toLowerCase().includes('hood') ||
-                    node.name.toLowerCase().includes('trunk') ||
-                    node.name.toLowerCase().includes('roof') ||
-                    node.name.toLowerCase().includes('fender') ||
-                    node.name.toLowerCase().includes('quarter') ||
-                    node.name.toLowerCase().includes('bumper')
-                )) {
-                    node.visible = exteriorVisible;
+                if (node.isMesh && node.name) {
+                    const partName = node.name;
+                    if (!bodyParts.find(p => p.name === partName)) {
+                        bodyParts.push({
+                            name: partName,
+                            visible: true,
+                            node: node
+                        });
+
+                        const partItem = document.createElement('div');
+                        partItem.className = 'part-item';
+                        partItem.innerHTML = `
+                            <span class="part-name">${partName}</span>
+                            <div class="part-toggle active" data-part="${partName}"></div>
+                        `;
+
+                        partItem.addEventListener('click', () => toggleBodyPart(partName));
+                        partsList.appendChild(partItem);
+                    }
                 }
             });
+        }
+
+        function toggleBodyPart(partName) {
+            const part = bodyParts.find(p => p.name === partName);
+            if (!part) return;
+
+            carModel.traverse((node) => {
+                if (node.isMesh && node.name === partName) {
+                    node.visible = !node.visible;
+                }
+            });
+
+            part.visible = !part.visible;
+
+            // Update UI
+            const toggle = document.querySelector(`[data-part="${partName}"]`);
+            const item = toggle.parentElement;
+            if (part.visible) {
+                toggle.classList.add('active');
+                item.classList.remove('hidden');
+            } else {
+                toggle.classList.remove('active');
+                item.classList.add('hidden');
+            }
+        }
+
+        // Add TSN component
+        function addTSNComponent(type) {
+            const bbox = carModel ? new THREE.Box3().setFromObject(carModel) : new THREE.Box3();
+            const center = new THREE.Vector3();
+            bbox.getCenter(center);
+
+            let component;
+            switch(type) {
+                case 'gateway':
+                    component = createTSNBoard(0x00C853, 'Gateway', 3);
+                    break;
+                case 'zone':
+                    component = createTSNBoard(0x0066FF, 'Zone', 2.5);
+                    break;
+                case 'camera':
+                    component = createSensor(0x00BCD4, 2);
+                    component.userData.label = 'Camera';
+                    break;
+                case 'radar':
+                    component = createSensor(0xFF9800, 2);
+                    component.userData.label = 'Radar';
+                    break;
+                case 'lidar':
+                    component = createSensor(0x9C27B0, 2.5);
+                    component.userData.label = 'LiDAR';
+                    break;
+                case 'ultrasonic':
+                    component = createSensor(0x4CAF50, 1.2);
+                    component.userData.label = 'Ultrasonic';
+                    break;
+            }
+
+            component.position.set(center.x, center.y + 1, center.z);
+            tsnGroup.add(component);
+            updateConnections();
+            showToast(`Added ${type} component`);
         }
 
         // Mouse interaction for edit mode
@@ -880,6 +1100,7 @@
 
                     scene.add(carModel);
                     setupTSNComponents();
+                    analyzeBodyParts();
 
                     document.getElementById('loading').style.display = 'none';
                     document.getElementById('infoPanel').style.display = 'block';
@@ -917,28 +1138,7 @@
             loadModel(url, fileName);
         });
 
-        // View controls
-        document.getElementById('viewExterior').addEventListener('click', () => {
-            camera.position.set(8, 4, 12);
-            controls.target.set(0, 1, 0);
-            controls.update();
-            showToast('Exterior View');
-        });
-
-        document.getElementById('viewDashboard').addEventListener('click', () => {
-            camera.position.set(2, 2, 4);
-            controls.target.set(0, 1, 0);
-            controls.update();
-            showToast('Dashboard Zone');
-        });
-
-        document.getElementById('viewTrunk').addEventListener('click', () => {
-            camera.position.set(-6, 3, 8);
-            controls.target.set(-2, 1, 0);
-            controls.update();
-            showToast('Trunk - Main Gateway');
-        });
-
+        // Button controls
         document.getElementById('toggleTSN').addEventListener('click', function() {
             tsnVisible = !tsnVisible;
             tsnGroup.visible = tsnVisible;
@@ -948,12 +1148,16 @@
             showToast(tsnVisible ? 'TSN Components Visible' : 'TSN Components Hidden');
         });
 
-        document.getElementById('toggleExterior').addEventListener('click', function() {
-            exteriorVisible = !exteriorVisible;
-            toggleExterior();
+        document.getElementById('partSelector').addEventListener('click', function() {
+            const panel = document.getElementById('partsPanel');
+            panel.classList.toggle('visible');
             this.classList.toggle('active');
-            this.textContent = exteriorVisible ? '🚗 Hide Exterior' : '🚗 Show Exterior';
-            showToast(exteriorVisible ? 'Exterior Visible' : 'Exterior Hidden - Interior View');
+        });
+
+        document.getElementById('addComponent').addEventListener('click', function() {
+            const panel = document.getElementById('addPanel');
+            panel.classList.toggle('visible');
+            this.classList.toggle('active');
         });
 
         document.getElementById('editMode').addEventListener('click', function() {
@@ -961,6 +1165,13 @@
             this.classList.toggle('active');
             this.textContent = editMode ? '✏️ View Mode' : '✏️ Edit Mode';
             showToast(editMode ? 'Edit Mode - Drag TSN Components' : 'View Mode');
+        });
+
+        document.getElementById('autoRotate').addEventListener('click', function() {
+            controls.autoRotate = !controls.autoRotate;
+            this.classList.toggle('active');
+            this.textContent = controls.autoRotate ? '⏸️ Stop Rotate' : '🔄 Auto Rotate';
+            showToast(controls.autoRotate ? 'Auto Rotation ON' : 'Auto Rotation OFF');
         });
 
         document.getElementById('uploadBtn').addEventListener('click', () => {
